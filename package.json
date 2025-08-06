@@ -1,0 +1,46 @@
+{
+  "name": "confluence-sync",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.cts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "zshy": {
+    "bin": "./src/cli.ts",
+    "exports": "./src/index.ts"
+  },
+  "types": "./dist/index.d.cts",
+  "bin": "./dist/cli.cjs",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "zshy",
+    "cli": "bun run ./src/cli.ts",
+    "test": "vitest run",
+    "lint": "eslint ./src --ext .ts,.tsx",
+    "lint:fix": "eslint ./src --ext .ts,.tsx --fix",
+    "download:openapi": "curl 'https://dac-static.atlassian.com/cloud/confluence/openapi-v2.v3.json?_v=1.8019.0-0.1324.0' -o ./src/openapi.json",
+    "gen:openapi": "openapi-typescript ./src/openapi.json --output ./src/index.ts"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.14.0",
+    "zshy": "^0.3.4"
+  },
+  "devDependencies": {
+    "@nyxb/eslint-config": "^3.1.0",
+    "@types/bun": "latest",
+    "eslint": "^9.32.0",
+    "openapi-typescript": "^7.8.0"
+  }
+}
