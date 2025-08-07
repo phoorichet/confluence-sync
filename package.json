@@ -45,8 +45,9 @@
     "test": "vitest run",
     "lint": "eslint ./src --ext .ts,.tsx",
     "lint:fix": "eslint ./src --ext .ts,.tsx --fix",
-    "download:openapi": "curl 'https://dac-static.atlassian.com/cloud/confluence/openapi-v2.v3.json?_v=1.8019.0-0.1324.0' -o ./src/openapi.json",
-    "gen:openapi": "openapi-typescript ./src/openapi.json --output ./src/index.ts"
+    "download:openapi": "bun run scripts/download-openapi.ts",
+    "gen:openapi": "openapi-typescript ./src/openapi/confluence-openapi.json --output ./src/api/types.ts"
+
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -55,20 +56,22 @@
     "@types/inquirer": "^9.0.9",
     "@zowe/secrets-for-zowe-sdk": "^8.24.2",
     "chalk": "^5.5.0",
-    "commander": "12.0.0",
+    "commander": "14.0.0",
     "glob": "^11.0.3",
     "gray-matter": "^4.0.3",
     "inquirer": "^12.9.0",
-    "openapi-fetch": "^0.14.0",
+    "openapi-fetch": "0.14.0",
     "ora": "^8.2.0",
+    "p-limit": "6.2.0",
     "zod": "^4.0.15",
-    "zshy": "^0.3.4"
+    "zshy": "^0.3.5"
   },
   "devDependencies": {
     "@nyxb/eslint-config": "^3.1.0",
     "@types/bun": "latest",
     "eslint": "^9.32.0",
-    "openapi-typescript": "^7.8.0",
-    "vitest": "1.2.0"
+    "msw": "2.10.4",
+    "openapi-typescript": "7.8.0",
+    "vitest": "3.2.4"
   }
 }

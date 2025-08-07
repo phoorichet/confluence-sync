@@ -11,7 +11,12 @@ export default nyxb({
     quotes: 'single',
     semi: true,
   },
-  ignores: ['node_modules', 'dist'],
+  ignores: [
+    'node_modules',
+    'dist',
+    'src/openapi/confluence-openapi.json',
+    'src/api/types.ts',
+  ],
 }, ...compat.config({
   extends: [],
   rules: {
