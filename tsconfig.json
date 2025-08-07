@@ -5,9 +5,10 @@
     // Environment setup & latest features
     "lib": ["ESNext"],
     "moduleDetection": "force",
-    "module": "Preserve",
-
+    
     // Bundler mode
+    "baseUrl": ".",
+    "module": "Preserve",
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "allowJs": true,
@@ -16,13 +17,21 @@
     "strict": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true,
-
     "noPropertyAccessFromIndexSignature": false,
     "noUncheckedIndexedAccess": true,
 
     // Some stricter flags (disabled by default)
     "noUnusedLocals": false,
     "noUnusedParameters": false,
+    
+    // Path aliases
+    "paths": {
+      "@commands/*": ["./src/commands/*"],
+      "@api/*": ["./src/api/*"],
+      "@sync/*": ["./src/sync/*"],
+      "@utils/*": ["./src/utils/*"]
+    },
+    
     "noEmit": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true

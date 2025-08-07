@@ -6,11 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a TypeScript project for syncing with Confluence API, built with Bun runtime. It uses OpenAPI TypeScript generation to create type-safe API client interfaces.
 
+**Important:** While we use Bun as the runtime, we use Node.js import syntax (e.g., `import { readFileSync } from 'node:fs'`) for better compatibility and standards compliance.
+
 ## Essential Commands
 
 ### Development
 - `bun install` - Install dependencies
-- `bun run build` - Build the project using zshy bundler (creates dist/ with CJS/ESM outputs)
+- `bun run build` - Build the project using zshy (creates dist/ with CJS/ESM outputs and updates package.json exports)
+  - **IMPORTANT:** Always run `bun run build` after making changes to ensure dist/ is up-to-date
+  - This command automatically generates all necessary files in dist/ directory
+  - The build process also updates package.json with correct export paths
 - `bun run cli` - Run the CLI tool directly from source
 - `bun run lint` - Run ESLint on TypeScript files in src/
 - `bun run lint:fix` - Auto-fix linting issues
@@ -33,6 +38,8 @@ This is a TypeScript project for syncing with Confluence API, built with Bun run
 ### Build System
 - Uses `zshy` bundler-free TypeScript build tool
 - Outputs both CommonJS (.cjs) and ES modules (.js) to dist/
+- Automatically generates type definitions (.d.ts and .d.cts files)
+- Updates package.json exports automatically during build
 - TypeScript configured for bundler mode with strict settings
 - ESLint configured with @nyxb/eslint-config (indent: 2, quotes: single, semi: true)
 
@@ -42,6 +49,13 @@ This is a TypeScript project for syncing with Confluence API, built with Bun run
 - Uses `openapi-fetch` for runtime-safe API calls
 
 ## Important Notes
-- The project uses Bun runtime, not Node.js
+- The project uses Bun runtime with Node.js import syntax (e.g., `node:fs`, `node:path`)
+- Always use Node.js-style imports: `import { readFileSync } from 'node:fs'` not `import { readFileSync } from 'fs'`
 - src/index.ts is auto-generated - never edit it directly
 - API client is configured to use http://localhost:8787 as base URL
+- After any code changes, run `bun run build` to update dist/ directory
+- The dist/ directory contains:
+  - CommonJS files (.cjs)
+  - ES modules (.js)
+  - TypeScript declarations (.d.ts, .d.cts)
+- package.json is automatically updated by zshy during build process
