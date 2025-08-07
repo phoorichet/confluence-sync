@@ -2,7 +2,9 @@
 
 import process from 'node:process';
 import { Command } from 'commander';
+import { authCommand } from './commands/auth.js';
 import { registerHealthCommand } from './commands/health.js';
+import { syncCommand } from './commands/sync.js';
 import { getPackageInfo } from './utils/package-info.js';
 
 // Get package information
@@ -17,7 +19,9 @@ program
   .version(packageInfo.version);
 
 // Register commands
+program.addCommand(authCommand);
 registerHealthCommand(program);
+program.addCommand(syncCommand);
 
 // Parse command line arguments
 program.parse(process.argv);
