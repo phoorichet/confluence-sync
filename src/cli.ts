@@ -6,6 +6,7 @@ import { authCommand } from './commands/auth.js';
 import { healthCommand } from './commands/health.js';
 import { pullCommand } from './commands/pull.js';
 import { pushCommand } from './commands/push.js';
+import { statusCommand } from './commands/status.js';
 import { syncCommand } from './commands/sync.js';
 import { getPackageInfo } from './utils/package-info.js';
 
@@ -25,6 +26,7 @@ program.addCommand(authCommand);
 program.addCommand(healthCommand);
 program.addCommand(pullCommand);
 program.addCommand(pushCommand);
+program.addCommand(statusCommand);
 program.addCommand(syncCommand);
 
 // Parse command line arguments
