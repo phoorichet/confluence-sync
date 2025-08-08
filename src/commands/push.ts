@@ -8,19 +8,26 @@ import { Command } from 'commander';
 import * as diff from 'diff';
 import ora from 'ora';
 import { apiClient } from '../api/client';
+import { ConfluenceToMarkdownConverter } from '../converters/confluence-to-markdown';
 import { MarkdownToConfluenceConverter } from '../converters/markdown-to-confluence';
+import { BackupManager } from '../storage/backup-manager';
 import { FileManager } from '../storage/file-manager';
 import { ManifestManager } from '../storage/manifest-manager';
+import { ConflictResolver } from '../sync/conflict-resolver';
 import { logger } from '../utils/logger';
 
 interface PushOptions {
   dryRun?: boolean;
+  forceLocal?: boolean;
+  forceRemote?: boolean;
 }
 
 export const pushCommand = new Command('push')
   .description('Push local Markdown changes to Confluence')
   .argument('<file>', 'Markdown file to push')
   .option('--dry-run', 'Preview changes without actually pushing')
+  .option('--force-local', 'Force local version in case of conflicts')
+  .option('--force-remote', 'Force remote version in case of conflicts')
   .action(async (file: string, options: PushOptions) => {
     const spinner = ora();
 
@@ -61,7 +68,7 @@ export const pushCommand = new Command('push')
 
       // Read file content
       spinner.start('Reading file content...');
-      const fileManager = new FileManager();
+      const fileManager = FileManager.getInstance();
       const content = await fileManager.readFile(absolutePath);
       spinner.succeed('File content read');
 
@@ -92,22 +99,56 @@ export const pushCommand = new Command('push')
       if (remotePage.version && remotePage.version.number > page.version) {
         spinner.fail();
 
-        // Create backup if conflict detected
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
-        const backupPath = absolutePath.replace('.md', `.backup-${timestamp}.md`);
-        await fileManager.createBackup(absolutePath, backupPath);
-        console.log(chalk.yellow(`⚠ Backup created: ${backupPath}`));
+        // Handle conflict with force flags
+        if (options.forceLocal || options.forceRemote) {
+          const conflictResolver = ConflictResolver.getInstance();
+          const backupManager = BackupManager.getInstance();
 
-        // Update manifest with conflicted status
-        await manifestManager.updatePage({
-          ...page,
-          status: 'conflicted',
-        });
+          conflictResolver.setManagers(manifestManager, fileManager, backupManager);
 
-        throw new Error(
-          `CS-409: Conflict detected! Remote page has been updated (version ${remotePage.version.number} vs local version ${page.version}). `
-          + `Please pull the latest changes and merge manually.`,
-        );
+          if (options.forceLocal) {
+            console.log(chalk.yellow('⚠ Forcing local version...'));
+            // Continue with push (local wins)
+          }
+          else if (options.forceRemote) {
+            console.log(chalk.yellow('⚠ Forcing remote version...'));
+
+            // Convert remote content to markdown
+            const confluenceConverter = new ConfluenceToMarkdownConverter();
+            const remoteMarkdown = await confluenceConverter.convert(remotePage.body?.storage?.value || '');
+
+            // Write remote content to local file
+            await fileManager.writeFile(absolutePath, remoteMarkdown);
+
+            // Update manifest to synced
+            await manifestManager.updatePage({
+              ...page,
+              version: remotePage.version.number,
+              status: 'synced',
+            });
+
+            console.log(chalk.green('✓ Remote version applied locally'));
+            return;
+          }
+        }
+        else {
+          // Create backup if conflict detected
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+          const backupPath = absolutePath.replace('.md', `.backup-${timestamp}.md`);
+          await fileManager.createBackup(absolutePath, backupPath);
+          console.log(chalk.yellow(`⚠ Backup created: ${backupPath}`));
+
+          // Update manifest with conflicted status
+          await manifestManager.updatePage({
+            ...page,
+            status: 'conflicted',
+          });
+
+          throw new Error(
+            `CS-409: Conflict detected! Remote page has been updated (version ${remotePage.version.number} vs local version ${page.version}). `
+            + `Use --force-local to push anyway or --force-remote to pull remote changes.`,
+          );
+        }
       }
 
       spinner.succeed('No conflicts detected');

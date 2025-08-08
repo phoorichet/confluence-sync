@@ -4,17 +4,20 @@ import path from 'node:path';
 import { apiClient } from '../api/client.js';
 import { calculateFileHash, hashesMatch } from '../utils/hash.js';
 import { logger } from '../utils/logger.js';
+import { ConflictResolver } from './conflict-resolver.js';
 
-export type ChangeState = 'local-only' | 'remote-only' | 'both-changed' | 'unchanged';
+export type ChangeState = 'local-only' | 'remote-only' | 'both-changed' | 'unchanged' | 'conflicted';
 
 export interface ChangeDetectionResult {
   pageId: string;
   localPath: string;
   state: ChangeState;
   localHash?: string;
+  remoteHash?: string;
   remoteVersion?: number;
   manifestHash?: string;
   manifestVersion?: number;
+  isConflict?: boolean;
 }
 
 export class ChangeDetector {
@@ -97,6 +100,25 @@ export class ChangeDetector {
       ]);
 
       if (localChanged && remoteChanged) {
+        // Check for conflict
+        const localHash = this.getCurrentFileHash(page);
+        const remotePage = await apiClient.getPage(page.id);
+
+        if (localHash && remotePage?.body?.storage?.value) {
+          // Get remote content hash (simplified - in real implementation would need to convert and hash)
+          const conflictResolver = ConflictResolver.getInstance();
+          const conflict = await conflictResolver.detectConflict(
+            page.id,
+            localHash,
+            page.remoteHash || '', // Use stored remote hash
+            page.version,
+            remotePage.version?.number,
+          );
+
+          if (conflict) {
+            return 'conflicted';
+          }
+        }
         return 'both-changed';
       }
       else if (localChanged) {

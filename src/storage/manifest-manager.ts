@@ -25,6 +25,14 @@ const SyncOperationSchema = z.object({
   error: z.string().nullable(),
 });
 
+// Resolution history schema for tracking conflict resolutions
+const ResolutionRecordSchema = z.object({
+  timestamp: z.date(),
+  strategy: z.enum(['manual', 'local-first', 'remote-first']),
+  previousLocalHash: z.string().optional(),
+  previousRemoteHash: z.string().optional(),
+});
+
 // Define the Page schema
 const PageSchema = z.object({
   id: z.string(),
@@ -35,8 +43,10 @@ const PageSchema = z.object({
   lastModified: z.date(),
   localPath: z.string(),
   contentHash: z.string(),
+  remoteHash: z.string().optional(), // Hash of remote content for conflict detection
   status: z.enum(['synced', 'modified', 'conflicted']),
   children: z.array(z.string()).optional(), // Child page IDs for hierarchy
+  resolutionHistory: z.array(ResolutionRecordSchema).optional(), // Track conflict resolutions
 });
 
 // Define the SyncManifest schema (v2)
@@ -58,6 +68,7 @@ const _SyncManifestV1Schema = z.object({
   pages: z.map(z.string(), PageSchema),
 });
 
+export type ResolutionRecord = z.infer<typeof ResolutionRecordSchema>;
 export type Page = z.infer<typeof PageSchema>;
 export type SyncConfig = z.infer<typeof SyncConfigSchema>;
 export type SyncOperation = z.infer<typeof SyncOperationSchema>;
@@ -481,5 +492,12 @@ export class ManifestManager {
       logger.error('Failed to clear pages from manifest', error);
       throw new Error(`CS-503: Failed to update manifest: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  /**
+   * Clear singleton instance (for testing)
+   */
+  static clearInstance(): void {
+    ManifestManager.instance = null as any;
   }
 }

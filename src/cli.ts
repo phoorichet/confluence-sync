@@ -3,6 +3,7 @@
 import process from 'node:process';
 import { Command } from 'commander';
 import { authCommand } from './commands/auth.js';
+import { conflictsCommand } from './commands/conflicts.js';
 import { healthCommand } from './commands/health.js';
 import { pullCommand } from './commands/pull.js';
 import { pushCommand } from './commands/push.js';
@@ -23,6 +24,7 @@ program
 
 // Register commands
 program.addCommand(authCommand);
+program.addCommand(conflictsCommand);
 program.addCommand(healthCommand);
 program.addCommand(pullCommand);
 program.addCommand(pushCommand);

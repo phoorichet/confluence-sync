@@ -4,10 +4,48 @@ import path from 'node:path';
 import { logger } from '../utils/logger.js';
 
 export class FileManager {
+  private static instance: FileManager;
+
+  private constructor() {}
+
+  public static getInstance(): FileManager {
+    if (!FileManager.instance) {
+      FileManager.instance = new FileManager();
+    }
+    return FileManager.instance;
+  }
+
+  /**
+   * Write content to a file
+   */
+  async writeFile(filePath: string, content: string): Promise<string> {
+    try {
+      const absolutePath = path.resolve(filePath);
+      const dir = path.dirname(absolutePath);
+
+      // Ensure directory exists
+      if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true });
+        logger.info(`Created directory: ${dir}`);
+      }
+
+      // Write the file
+      writeFileSync(absolutePath, content, 'utf-8');
+      logger.info(`Wrote file: ${absolutePath}`);
+
+      return absolutePath;
+    }
+    catch (error) {
+      logger.error('Failed to write file', error);
+      throw new Error(`CS-502: Failed to write file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
   /**
    * Write a file to the filesystem with backup if it exists
+   * @deprecated Use writeFile(filePath, content) instead
    */
-  async writeFile(outputDir: string, filename: string, content: string): Promise<string> {
+  async writeFileWithDir(outputDir: string, filename: string, content: string): Promise<string> {
     try {
       // Ensure output directory exists
       const absoluteDir = path.resolve(outputDir);
@@ -115,5 +153,12 @@ export class FileManager {
       logger.error('Failed to read file', error);
       throw new Error(`CS-502: Failed to read file: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  /**
+   * Clear singleton instance (for testing)
+   */
+  static clearInstance(): void {
+    FileManager.instance = null as any;
   }
 }

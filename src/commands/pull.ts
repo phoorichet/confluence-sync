@@ -47,10 +47,11 @@ export const pullCommand = new Command('pull')
 
       // Save to filesystem
       progress.update('Saving to filesystem...');
-      const fileManager = new FileManager();
+      const fileManager = FileManager.getInstance();
       const outputDir = path.resolve(options.output);
       const filename = fileManager.sanitizeFilename(pageTitle);
-      const filePath = await fileManager.writeFile(outputDir, filename, markdown);
+      const outputPath = path.join(outputDir, `${filename}.md`);
+      const filePath = await fileManager.writeFile(outputPath, markdown);
 
       // Update manifest
       progress.update('Updating manifest...');
