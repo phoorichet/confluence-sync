@@ -4,15 +4,42 @@ import { AuthManager } from '../auth/auth-manager';
 import { CircuitBreaker, ErrorMapper, isTransientError, RetryHandler } from './circuit-breaker';
 import { RateLimiter } from './rate-limiter';
 
+// Define response types for better type safety
+export interface PageResponse {
+  id: string;
+  title: string;
+  status: string;
+  version?: {
+    number: number;
+    message?: string;
+  };
+  body?: {
+    storage?: {
+      value: string;
+      representation: string;
+    };
+  };
+  [key: string]: any;
+}
+
+export interface SpaceResponse {
+  id: string;
+  key: string;
+  name: string;
+  [key: string]: any;
+}
+
 export class ConfluenceAPIClient {
+  private static instance: ConfluenceAPIClient;
   private client: ReturnType<typeof createClient<paths>>;
   private authManager: AuthManager;
   private baseUrl: string = '';
   private circuitBreaker: CircuitBreaker;
   private retryHandler: RetryHandler;
   private rateLimiter: RateLimiter;
+  private initialized = false;
 
-  constructor() {
+  private constructor() {
     this.authManager = AuthManager.getInstance();
     this.client = createClient<paths>({
       baseUrl: '',
@@ -42,7 +69,18 @@ export class ConfluenceAPIClient {
     });
   }
 
+  public static getInstance(): ConfluenceAPIClient {
+    if (!ConfluenceAPIClient.instance) {
+      ConfluenceAPIClient.instance = new ConfluenceAPIClient();
+    }
+    return ConfluenceAPIClient.instance;
+  }
+
   public async initialize(): Promise<void> {
+    // Prevent double initialization
+    if (this.initialized) {
+      return;
+    }
     const credentials = await this.authManager.getStoredCredentials();
     if (!credentials?.url) {
       throw new Error('CS-401: No stored credentials found. Please authenticate first.');
@@ -78,6 +116,8 @@ export class ConfluenceAPIClient {
         return response;
       },
     });
+
+    this.initialized = true;
   }
 
   private normalizeApiUrl(url: string): string {
@@ -107,28 +147,40 @@ export class ConfluenceAPIClient {
     return url;
   }
 
-  public async getPage(pageId: string, expand?: string[]): Promise<any> {
+  public async getPage(pageId: string, includeBody = false): Promise<PageResponse> {
     return this.executeWithProtection(async () => {
+      // Convert string ID to number as required by the API
+      const numericId = Number.parseInt(pageId, 10);
+      if (Number.isNaN(numericId)) {
+        throw new TypeError(`CS-400: Invalid page ID: ${pageId}`);
+      }
+
       const response = await this.client.GET('/pages/{id}', {
         params: {
-          path: { id: pageId },
-          query: expand ? { expand: expand.join(',') } : {},
+          path: { id: numericId },
+          query: includeBody ? { 'body-format': 'storage' as const } : {},
         },
       });
 
-      if (response.error) {
-        throw new Error(`CS-404: Failed to get page ${pageId}: ${response.error}`);
+      if (response.error || !response.data) {
+        throw new Error(`CS-404: Failed to get page ${pageId}: ${response.error || 'No data returned'}`);
       }
 
-      return response.data;
+      return response.data as PageResponse;
     }, { timeout: 30000 }); // 30s timeout for single page
   }
 
-  public async updatePage(pageId: string, title: string, body: string, version: number): Promise<any> {
+  public async updatePage(pageId: string, body: string, version: number, title: string): Promise<PageResponse> {
     return this.executeWithProtection(async () => {
+      // Convert string ID to number as required by the API
+      const numericId = Number.parseInt(pageId, 10);
+      if (Number.isNaN(numericId)) {
+        throw new TypeError(`CS-400: Invalid page ID: ${pageId}`);
+      }
+
       const response = await this.client.PUT('/pages/{id}', {
         params: {
-          path: { id: pageId },
+          path: { id: numericId },
         },
         body: {
           id: pageId,
@@ -139,21 +191,21 @@ export class ConfluenceAPIClient {
             value: body,
           },
           version: {
-            number: version + 1,
+            number: version,
             message: 'Updated via confluence-sync',
           },
         },
       });
 
-      if (response.error) {
-        throw new Error(`CS-500: Failed to update page ${pageId}: ${response.error}`);
+      if (response.error || !response.data) {
+        throw new Error(`CS-500: Failed to update page ${pageId}: ${response.error || 'No data returned'}`);
       }
 
-      return response.data;
+      return response.data as PageResponse;
     }, { timeout: 30000 }); // 30s timeout for single page
   }
 
-  public async getSpace(spaceKey: string): Promise<any> {
+  public async getSpace(spaceKey: string): Promise<SpaceResponse | null> {
     return this.executeWithProtection(async () => {
       const response = await this.client.GET('/spaces', {
         params: {
@@ -168,23 +220,26 @@ export class ConfluenceAPIClient {
       }
 
       const spaces = response.data?.results || [];
-      return spaces.length > 0 ? spaces[0] : null;
+      return spaces.length > 0 ? spaces[0] as SpaceResponse : null;
     }, { timeout: 30000 });
   }
 
-  public async searchPages(spaceKey: string, _query?: string): Promise<any[]> {
+  public async searchPages(spaceKey: string, query?: string): Promise<PageResponse[]> {
     return this.executeWithProtection(async () => {
-      // Note: cql would be used for V1 API, but V2 uses different query params
-      // const cql = query
-      //   ? `space.key="${spaceKey}" AND title~"${query}"`
-      //   : `space.key="${spaceKey}"`;
+      // Build query parameters based on V2 API structure
+      const queryParams: any = {
+        spaceKey: [spaceKey],
+        limit: 250,
+      };
+
+      // Add title filtering if query is provided
+      if (query) {
+        queryParams.title = query;
+      }
 
       const response = await this.client.GET('/pages', {
         params: {
-          query: {
-            spaceKey: [spaceKey],
-            limit: 250,
-          },
+          query: queryParams,
         },
       });
 
@@ -192,11 +247,11 @@ export class ConfluenceAPIClient {
         throw new Error(`CS-500: Failed to search pages: ${response.error}`);
       }
 
-      return response.data?.results || [];
+      return (response.data?.results || []) as PageResponse[];
     }, { timeout: 300000 }); // 5min timeout for bulk operations
   }
 
-  public async createPage(spaceId: string, title: string, body: string, parentId?: string): Promise<any> {
+  public async createPage(spaceId: string, title: string, body: string, parentId?: string): Promise<PageResponse> {
     return this.executeWithProtection(async () => {
       const requestBody: any = {
         spaceId,
@@ -216,19 +271,25 @@ export class ConfluenceAPIClient {
         body: requestBody,
       });
 
-      if (response.error) {
-        throw new Error(`CS-500: Failed to create page: ${response.error}`);
+      if (response.error || !response.data) {
+        throw new Error(`CS-500: Failed to create page: ${response.error || 'No data returned'}`);
       }
 
-      return response.data;
+      return response.data as PageResponse;
     }, { timeout: 30000 });
   }
 
   public async deletePage(pageId: string): Promise<void> {
     return this.executeWithProtection(async () => {
+      // Convert string ID to number as required by the API
+      const numericId = Number.parseInt(pageId, 10);
+      if (Number.isNaN(numericId)) {
+        throw new TypeError(`CS-400: Invalid page ID: ${pageId}`);
+      }
+
       const response = await this.client.DELETE('/pages/{id}', {
         params: {
-          path: { id: pageId },
+          path: { id: numericId },
         },
       });
 
@@ -238,11 +299,17 @@ export class ConfluenceAPIClient {
     }, { timeout: 30000 });
   }
 
-  public async getPageChildren(pageId: string): Promise<any[]> {
+  public async getPageChildren(pageId: string): Promise<PageResponse[]> {
     return this.executeWithProtection(async () => {
+      // Convert string ID to number as required by the API
+      const numericId = Number.parseInt(pageId, 10);
+      if (Number.isNaN(numericId)) {
+        throw new TypeError(`CS-400: Invalid page ID: ${pageId}`);
+      }
+
       const response = await this.client.GET('/pages/{id}/children', {
         params: {
-          path: { id: pageId },
+          path: { id: numericId },
           query: {
             limit: 250,
           },
@@ -253,27 +320,13 @@ export class ConfluenceAPIClient {
         throw new Error(`CS-500: Failed to get page children: ${response.error}`);
       }
 
-      return response.data?.results || [];
+      return (response.data?.results || []) as PageResponse[];
     }, { timeout: 300000 }); // 5min timeout for bulk operations
   }
 
   public async getPageContent(pageId: string): Promise<string> {
-    return this.executeWithProtection(async () => {
-      const response = await this.client.GET('/pages/{id}/body', {
-        params: {
-          path: { id: pageId },
-          query: {
-            body_format: 'storage',
-          },
-        },
-      });
-
-      if (response.error) {
-        throw new Error(`CS-404: Failed to get page content: ${response.error}`);
-      }
-
-      return response.data?.storage?.value || '';
-    }, { timeout: 30000 });
+    const page = await this.getPage(pageId, true);
+    return page.body?.storage?.value || '';
   }
 
   private async executeWithProtection<T>(
@@ -316,4 +369,5 @@ export class ConfluenceAPIClient {
   }
 }
 
-export const apiClient = new ConfluenceAPIClient();
+// Export singleton instance
+export const apiClient = ConfluenceAPIClient.getInstance();

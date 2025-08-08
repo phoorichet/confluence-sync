@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getPackageInfo, getPackageName, getVersion } from '../../../src/utils/package-info';
 
-describe('Package Info Utilities', () => {
+describe('package Info Utilities', () => {
   it('should return package information', () => {
     const packageInfo = getPackageInfo();
     expect(packageInfo).toBeDefined();

@@ -3,7 +3,9 @@
 import process from 'node:process';
 import { Command } from 'commander';
 import { authCommand } from './commands/auth.js';
-import { registerHealthCommand } from './commands/health.js';
+import { healthCommand } from './commands/health.js';
+import { pullCommand } from './commands/pull.js';
+import { pushCommand } from './commands/push.js';
 import { syncCommand } from './commands/sync.js';
 import { getPackageInfo } from './utils/package-info.js';
 
@@ -20,7 +22,9 @@ program
 
 // Register commands
 program.addCommand(authCommand);
-registerHealthCommand(program);
+program.addCommand(healthCommand);
+program.addCommand(pullCommand);
+program.addCommand(pushCommand);
 program.addCommand(syncCommand);
 
 // Parse command line arguments

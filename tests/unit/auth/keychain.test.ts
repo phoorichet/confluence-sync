@@ -1,12 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { keyring } from '@zowe/secrets-for-zowe-sdk';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Keychain } from '../../../src/auth/keychain';
 import { logger } from '../../../src/utils/logger';
 
 vi.mock('@zowe/secrets-for-zowe-sdk');
 vi.mock('../../../src/utils/logger');
 
-describe('Keychain', () => {
+describe('keychain', () => {
   let keychain: Keychain;
   let mockKeyring: any;
   let mockLogger: any;
@@ -37,7 +37,7 @@ describe('Keychain', () => {
       expect(password).toBeNull();
       expect(mockLogger.error).toHaveBeenCalledWith(
         'CS-500: Failed to retrieve password from keychain',
-        error
+        error,
       );
     });
   });
@@ -56,7 +56,8 @@ describe('Keychain', () => {
       mockKeyring.setPassword.mockRejectedValue(error);
 
       await expect(keychain.setPassword('service', 'account', 'password'))
-        .rejects.toThrow('CS-500: Failed to store credentials');
+        .rejects
+        .toThrow('CS-500: Failed to store credentials');
     });
   });
 
@@ -79,7 +80,7 @@ describe('Keychain', () => {
       expect(result).toBe(false);
       expect(mockLogger.error).toHaveBeenCalledWith(
         'CS-500: Failed to delete password from keychain',
-        error
+        error,
       );
     });
   });
@@ -107,7 +108,7 @@ describe('Keychain', () => {
       expect(result).toEqual([]);
       expect(mockLogger.error).toHaveBeenCalledWith(
         'CS-500: Failed to find credentials in keychain',
-        error
+        error,
       );
     });
   });

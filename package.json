@@ -43,26 +43,32 @@
     "build": "zshy",
     "cli": "bun run ./src/cli.ts",
     "test": "vitest run",
-    "lint": "eslint ./src --ext .ts,.tsx",
-    "lint:fix": "eslint ./src --ext .ts,.tsx --fix",
+    "lint": "eslint ./src ./tests --ext .ts,.tsx",
+    "lint:fix": "eslint ./src ./tests --ext .ts,.tsx --fix",
     "download:openapi": "bun run scripts/download-openapi.ts",
     "gen:openapi": "openapi-typescript ./src/openapi/confluence-openapi.json --output ./src/api/types.ts"
-
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
+    "@types/diff": "^8.0.0",
     "@types/inquirer": "^9.0.9",
+    "@types/mdast": "^4.0.4",
     "@zowe/secrets-for-zowe-sdk": "^8.24.2",
     "chalk": "^5.5.0",
     "commander": "14.0.0",
+    "diff": "^8.0.2",
     "glob": "^11.0.3",
     "gray-matter": "^4.0.3",
     "inquirer": "^12.9.0",
     "openapi-fetch": "0.14.0",
     "ora": "^8.2.0",
     "p-limit": "6.2.0",
+    "remark": "^15.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "unist-util-visit": "^5.0.0",
     "zod": "^4.0.15",
     "zshy": "^0.3.5"
   },
@@ -71,7 +77,12 @@
     "@types/bun": "latest",
     "eslint": "^9.32.0",
     "msw": "2.10.4",
+    "node-html-parser": "^7.0.1",
     "openapi-typescript": "7.8.0",
+    "rehype-parse": "^9.0.1",
+    "rehype-remark": "^10.0.1",
+    "remark-stringify": "^11.0.0",
+    "unified": "^11.0.5",
     "vitest": "3.2.4"
   }
 }

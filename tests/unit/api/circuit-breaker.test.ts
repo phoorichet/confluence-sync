@@ -1,13 +1,13 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { 
-  CircuitBreaker, 
-  CircuitState, 
-  RetryHandler, 
-  isTransientError,
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  CircuitBreaker,
+  CircuitState,
   ErrorMapper,
+  isTransientError,
+  RetryHandler,
 } from '../../../src/api/circuit-breaker';
 
-describe('CircuitBreaker', () => {
+describe('circuitBreaker', () => {
   let circuitBreaker: CircuitBreaker;
 
   beforeEach(() => {
@@ -26,9 +26,9 @@ describe('CircuitBreaker', () => {
   describe('execute', () => {
     it('should execute function when circuit is closed', async () => {
       const mockFn = vi.fn().mockResolvedValue('success');
-      
+
       const result = await circuitBreaker.execute(mockFn);
-      
+
       expect(result).toBe('success');
       expect(mockFn).toHaveBeenCalled();
       expect(circuitBreaker.getState()).toBe(CircuitState.CLOSED);
@@ -36,18 +36,19 @@ describe('CircuitBreaker', () => {
 
     it('should open circuit after failure threshold', async () => {
       const mockFn = vi.fn().mockRejectedValue(new Error('failure'));
-      
+
       // Fail 3 times (threshold)
       for (let i = 0; i < 3; i++) {
         try {
           await circuitBreaker.execute(mockFn);
-        } catch {
+        }
+        catch {
           // Expected to fail
         }
       }
-      
+
       expect(circuitBreaker.getState()).toBe(CircuitState.OPEN);
-      
+
       // Should reject immediately when open
       await expect(circuitBreaker.execute(mockFn)).rejects.toThrow('CS-503: Circuit breaker is open');
       expect(mockFn).toHaveBeenCalledTimes(3); // Not called on 4th attempt
@@ -59,21 +60,22 @@ describe('CircuitBreaker', () => {
         .mockRejectedValueOnce(new Error('failure'))
         .mockRejectedValueOnce(new Error('failure'))
         .mockResolvedValue('success');
-      
+
       // Open the circuit
       for (let i = 0; i < 3; i++) {
         try {
           await circuitBreaker.execute(mockFn);
-        } catch {
+        }
+        catch {
           // Expected
         }
       }
-      
+
       expect(circuitBreaker.getState()).toBe(CircuitState.OPEN);
-      
+
       // Wait for reset timeout
       await new Promise(resolve => setTimeout(resolve, 150));
-      
+
       // Should allow one attempt in half-open state
       const result = await circuitBreaker.execute(mockFn);
       expect(result).toBe('success');
@@ -82,29 +84,30 @@ describe('CircuitBreaker', () => {
 
     it('should close circuit after success threshold in half-open', async () => {
       const mockFn = vi.fn().mockResolvedValue('success');
-      
+
       // Manually set to half-open state
-      circuitBreaker['state'] = CircuitState.HALF_OPEN;
-      
+      circuitBreaker.state = CircuitState.HALF_OPEN;
+
       // Succeed twice (threshold)
       await circuitBreaker.execute(mockFn);
       await circuitBreaker.execute(mockFn);
-      
+
       expect(circuitBreaker.getState()).toBe(CircuitState.CLOSED);
     });
 
     it('should reopen circuit on failure in half-open state', async () => {
       const mockFn = vi.fn().mockRejectedValue(new Error('failure'));
-      
+
       // Manually set to half-open state
-      circuitBreaker['state'] = CircuitState.HALF_OPEN;
-      
+      circuitBreaker.state = CircuitState.HALF_OPEN;
+
       try {
         await circuitBreaker.execute(mockFn);
-      } catch {
+      }
+      catch {
         // Expected
       }
-      
+
       expect(circuitBreaker.getState()).toBe(CircuitState.OPEN);
     });
   });
@@ -112,20 +115,21 @@ describe('CircuitBreaker', () => {
   describe('reset', () => {
     it('should reset circuit to closed state', async () => {
       const mockFn = vi.fn().mockRejectedValue(new Error('failure'));
-      
+
       // Open the circuit
       for (let i = 0; i < 3; i++) {
         try {
           await circuitBreaker.execute(mockFn);
-        } catch {
+        }
+        catch {
           // Expected
         }
       }
-      
+
       expect(circuitBreaker.getState()).toBe(CircuitState.OPEN);
-      
+
       circuitBreaker.reset();
-      
+
       expect(circuitBreaker.getState()).toBe(CircuitState.CLOSED);
       const stats = circuitBreaker.getStats();
       expect(stats.failureCount).toBe(0);
@@ -134,7 +138,7 @@ describe('CircuitBreaker', () => {
   });
 });
 
-describe('RetryHandler', () => {
+describe('retryHandler', () => {
   let retryHandler: RetryHandler;
 
   beforeEach(() => {
@@ -155,9 +159,9 @@ describe('RetryHandler', () => {
   describe('execute', () => {
     it('should succeed on first attempt', async () => {
       const mockFn = vi.fn().mockResolvedValue('success');
-      
+
       const result = await retryHandler.execute(mockFn);
-      
+
       expect(result).toBe('success');
       expect(mockFn).toHaveBeenCalledTimes(1);
     });
@@ -166,22 +170,22 @@ describe('RetryHandler', () => {
       const mockFn = vi.fn()
         .mockRejectedValueOnce(new Error('failure'))
         .mockResolvedValue('success');
-      
+
       // Mock sleep to speed up test
       vi.spyOn(retryHandler as any, 'sleep').mockResolvedValue(undefined);
-      
+
       const result = await retryHandler.execute(mockFn);
-      
+
       expect(result).toBe('success');
       expect(mockFn).toHaveBeenCalledTimes(2);
     });
 
     it('should respect max retries', async () => {
       const mockFn = vi.fn().mockRejectedValue(new Error('failure'));
-      
+
       // Mock sleep to speed up test
       vi.spyOn(retryHandler as any, 'sleep').mockResolvedValue(undefined);
-      
+
       await expect(retryHandler.execute(mockFn)).rejects.toThrow('failure');
       expect(mockFn).toHaveBeenCalledTimes(4); // 1 initial + 3 retries
     });
@@ -189,13 +193,14 @@ describe('RetryHandler', () => {
     it('should use exponential backoff', async () => {
       const mockFn = vi.fn().mockRejectedValue(new Error('failure'));
       const sleepSpy = vi.spyOn(retryHandler as any, 'sleep').mockResolvedValue(undefined);
-      
+
       try {
         await retryHandler.execute(mockFn);
-      } catch {
+      }
+      catch {
         // Expected
       }
-      
+
       // Check delays: 10ms, 20ms, 40ms
       expect(sleepSpy).toHaveBeenCalledTimes(3);
       expect(sleepSpy).toHaveBeenNthCalledWith(1, 10);
@@ -207,7 +212,7 @@ describe('RetryHandler', () => {
       const nonRetryableError = new Error('not retryable');
       const mockFn = vi.fn().mockRejectedValue(nonRetryableError);
       const isRetryable = vi.fn().mockReturnValue(false);
-      
+
       await expect(retryHandler.execute(mockFn, isRetryable)).rejects.toThrow('not retryable');
       expect(mockFn).toHaveBeenCalledTimes(1); // No retries
       expect(isRetryable).toHaveBeenCalledWith(nonRetryableError);
@@ -219,10 +224,10 @@ describe('isTransientError', () => {
   it('should identify network errors as transient', () => {
     const error: any = { code: 'ECONNRESET' };
     expect(isTransientError(error)).toBe(true);
-    
+
     error.code = 'ETIMEDOUT';
     expect(isTransientError(error)).toBe(true);
-    
+
     error.code = 'ENOTFOUND';
     expect(isTransientError(error)).toBe(true);
   });
@@ -248,7 +253,7 @@ describe('isTransientError', () => {
   });
 });
 
-describe('ErrorMapper', () => {
+describe('errorMapper', () => {
   describe('mapHttpError', () => {
     it('should map HTTP status codes to error messages', () => {
       expect(ErrorMapper.mapHttpError(400).message).toContain('CS-400: Bad request');

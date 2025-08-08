@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Command } from 'commander';
-import { registerHealthCommand } from '../../../src/commands/health';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { healthCommand } from '../../../src/commands/health';
 
-describe('Health Command', () => {
+describe('health Command', () => {
   let program: Command;
   let consoleLogSpy: ReturnType<typeof vi.spyOn>;
 
@@ -13,16 +13,16 @@ describe('Health Command', () => {
   });
 
   it('should register health command', () => {
-    registerHealthCommand(program);
-    const healthCommand = program.commands.find(cmd => cmd.name() === 'health');
-    expect(healthCommand).toBeDefined();
-    expect(healthCommand?.description()).toBe('Check the health status of confluence-sync');
+    program.addCommand(healthCommand);
+    const foundHealthCommand = program.commands.find(cmd => cmd.name() === 'health');
+    expect(foundHealthCommand).toBeDefined();
+    expect(foundHealthCommand?.description()).toBe('Check the health status of confluence-sync');
   });
 
   it('should output correct health status message', () => {
-    registerHealthCommand(program);
+    program.addCommand(healthCommand);
     program.parse(['node', 'test', 'health']);
-    
+
     expect(consoleLogSpy).toHaveBeenCalledWith(
       expect.stringMatching(/^Confluence Sync v\d+\.\d+\.\d+ - OK$/),
     );

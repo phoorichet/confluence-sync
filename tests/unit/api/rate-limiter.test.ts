@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RateLimiter, TokenBucket } from '../../../src/api/rate-limiter';
 
-describe('RateLimiter', () => {
+describe('rateLimiter', () => {
   let rateLimiter: RateLimiter;
 
   beforeEach(() => {
@@ -21,14 +21,14 @@ describe('RateLimiter', () => {
     it('should initialize with default values', () => {
       const limiter = new RateLimiter();
       const stats = limiter.getStats();
-      
+
       expect(stats.requestsPerHour).toBe(5000);
       expect(stats.requestCount).toBe(0);
     });
 
     it('should initialize with custom values', () => {
       const stats = rateLimiter.getStats();
-      
+
       expect(stats.requestsPerHour).toBe(100);
       expect(stats.requestCount).toBe(0);
     });
@@ -37,12 +37,12 @@ describe('RateLimiter', () => {
   describe('execute', () => {
     it('should execute function and increment request count', async () => {
       const mockFn = vi.fn().mockResolvedValue('result');
-      
+
       const result = await rateLimiter.execute(mockFn);
-      
+
       expect(result).toBe('result');
       expect(mockFn).toHaveBeenCalled();
-      
+
       const stats = rateLimiter.getStats();
       expect(stats.requestCount).toBe(1);
     });
@@ -51,16 +51,16 @@ describe('RateLimiter', () => {
       const mockFn = vi.fn().mockImplementation(
         () => new Promise(resolve => setTimeout(() => resolve('result'), 10)),
       );
-      
+
       // Execute 3 concurrent requests (limit is 2)
       const promises = [
         rateLimiter.execute(mockFn),
         rateLimiter.execute(mockFn),
         rateLimiter.execute(mockFn),
       ];
-      
+
       const results = await Promise.all(promises);
-      
+
       expect(results).toEqual(['result', 'result', 'result']);
       expect(mockFn).toHaveBeenCalledTimes(3);
     });
@@ -68,7 +68,7 @@ describe('RateLimiter', () => {
     it('should handle 429 rate limit errors', async () => {
       const error = new Error('Too Many Requests');
       (error as any).status = 429;
-      
+
       let callCount = 0;
       const mockFn = vi.fn().mockImplementation(() => {
         callCount++;
@@ -77,12 +77,12 @@ describe('RateLimiter', () => {
         }
         return Promise.resolve('success');
       });
-      
+
       // Mock the sleep method to speed up test
       vi.spyOn(rateLimiter as any, 'sleep').mockResolvedValue(undefined);
-      
+
       const result = await rateLimiter.execute(mockFn);
-      
+
       expect(result).toBe('success');
       expect(mockFn).toHaveBeenCalledTimes(2);
     });
@@ -94,9 +94,9 @@ describe('RateLimiter', () => {
         'x-ratelimit-remaining': '50',
         'x-ratelimit-reset': '1234567890',
       };
-      
+
       rateLimiter.updateFromHeaders(headers);
-      
+
       const stats = rateLimiter.getStats();
       expect(stats.rateLimitRemaining).toBe(50);
       expect(stats.rateLimitReset).toEqual(new Date(1234567890 * 1000));
@@ -106,18 +106,18 @@ describe('RateLimiter', () => {
       const headers = new Headers();
       headers.set('x-ratelimit-remaining', '25');
       headers.set('x-ratelimit-reset', '1234567890');
-      
+
       rateLimiter.updateFromHeaders(headers);
-      
+
       const stats = rateLimiter.getStats();
       expect(stats.rateLimitRemaining).toBe(25);
     });
 
     it('should handle missing headers gracefully', () => {
       const headers = {};
-      
+
       rateLimiter.updateFromHeaders(headers);
-      
+
       const stats = rateLimiter.getStats();
       expect(stats.rateLimitRemaining).toBeUndefined();
       expect(stats.rateLimitReset).toBeUndefined();
@@ -127,12 +127,12 @@ describe('RateLimiter', () => {
   describe('getStats', () => {
     it('should return current statistics', async () => {
       const mockFn = vi.fn().mockResolvedValue('result');
-      
+
       await rateLimiter.execute(mockFn);
       await rateLimiter.execute(mockFn);
-      
+
       const stats = rateLimiter.getStats();
-      
+
       expect(stats.requestCount).toBe(2);
       expect(stats.requestsPerHour).toBe(100);
       expect(stats.usage).toBe(2);
@@ -143,14 +143,14 @@ describe('RateLimiter', () => {
   describe('reset', () => {
     it('should reset all counters', async () => {
       const mockFn = vi.fn().mockResolvedValue('result');
-      
+
       await rateLimiter.execute(mockFn);
-      
+
       let stats = rateLimiter.getStats();
       expect(stats.requestCount).toBe(1);
-      
+
       rateLimiter.reset();
-      
+
       stats = rateLimiter.getStats();
       expect(stats.requestCount).toBe(0);
       expect(stats.rateLimitRemaining).toBeUndefined();
@@ -159,7 +159,7 @@ describe('RateLimiter', () => {
   });
 });
 
-describe('TokenBucket', () => {
+describe('tokenBucket', () => {
   let bucket: TokenBucket;
 
   beforeEach(() => {
@@ -186,14 +186,14 @@ describe('TokenBucket', () => {
     it('should wait when not enough tokens', async () => {
       // Mock sleep to speed up test
       vi.spyOn(bucket as any, 'sleep').mockResolvedValue(undefined);
-      
+
       // Consume all tokens
       await bucket.acquire(10);
       expect(bucket.getAvailableTokens()).toBe(0);
-      
+
       // Try to acquire more - should wait
       await bucket.acquire(1);
-      
+
       // Sleep should have been called
       expect((bucket as any).sleep).toHaveBeenCalled();
     });
@@ -202,10 +202,10 @@ describe('TokenBucket', () => {
       // Use all tokens
       await bucket.acquire(10);
       expect(bucket.getAvailableTokens()).toBe(0);
-      
+
       // Simulate time passing by manually refilling
-      bucket['lastRefill'] = Date.now() - 1000; // 1 second ago
-      
+      bucket.lastRefill = Date.now() - 1000; // 1 second ago
+
       // Tokens should be refilled (1 token per second with 3600/hour rate)
       const available = bucket.getAvailableTokens();
       expect(available).toBeGreaterThan(0);
@@ -216,7 +216,7 @@ describe('TokenBucket', () => {
     it('should reset to full capacity', async () => {
       await bucket.acquire(5);
       expect(bucket.getAvailableTokens()).toBe(5);
-      
+
       bucket.reset();
       expect(bucket.getAvailableTokens()).toBe(10);
     });

@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthManager, type Credentials } from '../../../src/auth/auth-manager';
 import { Keychain } from '../../../src/auth/keychain';
@@ -17,7 +18,7 @@ vi.mock('../../../src/auth/keychain', () => {
 });
 vi.mock('openapi-fetch');
 
-describe('AuthManager', () => {
+describe('authManager', () => {
   let authManager: AuthManager;
   let mockKeychainInstance: any;
 
@@ -25,7 +26,7 @@ describe('AuthManager', () => {
     vi.clearAllMocks();
     // Reset singleton instance
     (AuthManager as any).instance = undefined;
-    
+
     // Get the mocked Keychain constructor
     const MockedKeychain = vi.mocked(Keychain);
     mockKeychainInstance = {
@@ -35,9 +36,9 @@ describe('AuthManager', () => {
       findCredentials: vi.fn(),
       clearCache: vi.fn(),
     };
-    
+
     MockedKeychain.mockImplementation(() => mockKeychainInstance);
-    
+
     authManager = AuthManager.getInstance();
   });
 
@@ -51,14 +52,14 @@ describe('AuthManager', () => {
       };
 
       mockKeychainInstance.setPassword = vi.fn().mockResolvedValue(undefined);
-      
+
       // Mock the validation API call
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => ({ displayName: 'Test User' }),
         response: { ok: true },
       });
-      global.fetch = mockFetch;
+      globalThis.fetch = mockFetch;
 
       const result = await authManager.authenticate(credentials);
 
@@ -82,14 +83,14 @@ describe('AuthManager', () => {
       };
 
       mockKeychainInstance.setPassword = vi.fn().mockResolvedValue(undefined);
-      
+
       // Mock the validation API call
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => ({ displayName: 'Test User' }),
         response: { ok: true },
       });
-      global.fetch = mockFetch;
+      globalThis.fetch = mockFetch;
 
       const result = await authManager.authenticate(credentials);
 
@@ -114,10 +115,10 @@ describe('AuthManager', () => {
         ok: false,
         response: { ok: false },
       });
-      global.fetch = mockFetch;
+      globalThis.fetch = mockFetch;
 
       await expect(authManager.authenticate(credentials)).rejects.toThrow('CS-401: Invalid credentials provided');
-      
+
       expect(mockKeychainInstance.setPassword).not.toHaveBeenCalled();
     });
 
@@ -195,7 +196,7 @@ describe('AuthManager', () => {
         ok: true,
         response: { ok: true },
       });
-      global.fetch = mockFetch;
+      globalThis.fetch = mockFetch;
 
       const isValid = await authManager.validateAuth();
 
@@ -227,7 +228,7 @@ describe('AuthManager', () => {
         ok: false,
         response: { ok: false },
       });
-      global.fetch = mockFetch;
+      globalThis.fetch = mockFetch;
 
       const isValid = await authManager.validateAuth();
 

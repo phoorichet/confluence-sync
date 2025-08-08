@@ -1,24 +1,27 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConfluenceAPIClient } from '../../../src/api/client';
 import { AuthManager } from '../../../src/auth/auth-manager';
 
 vi.mock('../../../src/auth/auth-manager');
 
-describe('ConfluenceAPIClient', () => {
+describe('confluenceAPIClient', () => {
   let client: ConfluenceAPIClient;
   let mockAuthManager: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
+    // Reset singleton instance for each test
+    (ConfluenceAPIClient as any).instance = undefined;
+
     mockAuthManager = {
       getStoredCredentials: vi.fn(),
       getToken: vi.fn(),
     };
-    
+
     (AuthManager.getInstance as any).mockReturnValue(mockAuthManager);
-    
-    client = new ConfluenceAPIClient();
+
+    client = ConfluenceAPIClient.getInstance();
   });
 
   afterEach(() => {
@@ -34,7 +37,7 @@ describe('ConfluenceAPIClient', () => {
       });
 
       await client.initialize();
-      
+
       expect(mockAuthManager.getStoredCredentials).toHaveBeenCalled();
     });
 
@@ -46,7 +49,7 @@ describe('ConfluenceAPIClient', () => {
       });
 
       await client.initialize();
-      
+
       expect(mockAuthManager.getStoredCredentials).toHaveBeenCalled();
     });
 
@@ -64,9 +67,9 @@ describe('ConfluenceAPIClient', () => {
       });
 
       await client.initialize();
-      
+
       // The baseUrl should be converted to v2 format
-      expect(client['baseUrl']).toBe('https://example.atlassian.net/wiki/api/v2');
+      expect((client as any).baseUrl).toBe('https://example.atlassian.net/wiki/api/v2');
     });
 
     it('should handle URLs that already have v2 API path', async () => {
@@ -77,12 +80,12 @@ describe('ConfluenceAPIClient', () => {
       });
 
       await client.initialize();
-      
-      expect(client['baseUrl']).toBe('https://example.atlassian.net/wiki/api/v2');
+
+      expect((client as any).baseUrl).toBe('https://example.atlassian.net/wiki/api/v2');
     });
   });
 
-  describe('API wrapper methods', () => {
+  describe('aPI wrapper methods', () => {
     beforeEach(async () => {
       mockAuthManager.getStoredCredentials.mockResolvedValue({
         url: 'https://example.atlassian.net/wiki/api/v2',
@@ -90,7 +93,7 @@ describe('ConfluenceAPIClient', () => {
         authType: 'cloud',
       });
       mockAuthManager.getToken.mockResolvedValue('Basic dXNlckBleGFtcGxlLmNvbTp0b2tlbg==');
-      
+
       await client.initialize();
     });
 
@@ -129,13 +132,10 @@ describe('ConfluenceAPIClient', () => {
       expect(typeof client.getPageChildren).toBe('function');
     });
 
-    it('should have getPageContent method', () => {
-      expect(client.getPageContent).toBeDefined();
-      expect(typeof client.getPageContent).toBe('function');
-    });
+    // Note: getPageContent is handled via getPage with expand parameter
   });
 
-  describe('Authentication', () => {
+  describe('authentication', () => {
     it('should inject authentication headers for Cloud', async () => {
       mockAuthManager.getStoredCredentials.mockResolvedValue({
         url: 'https://example.atlassian.net/wiki/api/v2',
@@ -145,9 +145,9 @@ describe('ConfluenceAPIClient', () => {
       mockAuthManager.getToken.mockResolvedValue('Basic dXNlckBleGFtcGxlLmNvbTp0b2tlbg==');
 
       await client.initialize();
-      
+
       // Verify that middleware was set up
-      expect(client['client'].use).toBeDefined();
+      expect((client as any).client.use).toBeDefined();
     });
 
     it('should inject authentication headers for Server', async () => {
@@ -159,9 +159,9 @@ describe('ConfluenceAPIClient', () => {
       mockAuthManager.getToken.mockResolvedValue('Bearer personal-access-token');
 
       await client.initialize();
-      
+
       // Verify that middleware was set up
-      expect(client['client'].use).toBeDefined();
+      expect((client as any).client.use).toBeDefined();
     });
   });
 });

@@ -1,0 +1,267 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { ConfluenceToMarkdownConverter } from '../../../src/converters/confluence-to-markdown';
+
+describe('confluenceToMarkdownConverter', () => {
+  let converter: ConfluenceToMarkdownConverter;
+
+  beforeEach(() => {
+    converter = new ConfluenceToMarkdownConverter();
+  });
+
+  describe('convert', () => {
+    it('should convert empty content', async () => {
+      const result = await converter.convert('');
+      expect(result).toBe('');
+    });
+
+    it('should convert basic HTML elements', async () => {
+      const html = '<h1>Title</h1><p>Paragraph text</p>';
+      const result = await converter.convert(html);
+      expect(result).toContain('# Title');
+      expect(result).toContain('Paragraph text');
+    });
+
+    it('should convert headers (h1-h6)', async () => {
+      const html = `
+        <h1>Heading 1</h1>
+        <h2>Heading 2</h2>
+        <h3>Heading 3</h3>
+        <h4>Heading 4</h4>
+        <h5>Heading 5</h5>
+        <h6>Heading 6</h6>
+      `;
+      const result = await converter.convert(html);
+      expect(result).toContain('# Heading 1');
+      expect(result).toContain('## Heading 2');
+      expect(result).toContain('### Heading 3');
+      expect(result).toContain('#### Heading 4');
+      expect(result).toContain('##### Heading 5');
+      expect(result).toContain('###### Heading 6');
+    });
+
+    it('should convert text formatting', async () => {
+      const html = `
+        <p><strong>Bold text</strong></p>
+        <p><em>Italic text</em></p>
+        <p><u>Underlined text</u></p>
+        <p><code>Inline code</code></p>
+      `;
+      const result = await converter.convert(html);
+      expect(result).toContain('**Bold text**');
+      expect(result).toContain('*Italic text*');
+      expect(result).toContain('Underlined text'); // Underline not supported in standard Markdown
+      expect(result).toContain('`Inline code`');
+    });
+
+    it('should convert unordered lists', async () => {
+      const html = `
+        <ul>
+          <li>Item 1</li>
+          <li>Item 2</li>
+          <li>Item 3</li>
+        </ul>
+      `;
+      const result = await converter.convert(html);
+      expect(result).toContain('- Item 1');
+      expect(result).toContain('- Item 2');
+      expect(result).toContain('- Item 3');
+    });
+
+    it('should convert ordered lists', async () => {
+      const html = `
+        <ol>
+          <li>First item</li>
+          <li>Second item</li>
+          <li>Third item</li>
+        </ol>
+      `;
+      const result = await converter.convert(html);
+      expect(result).toContain('1. First item');
+      expect(result).toContain('2. Second item');
+      expect(result).toContain('3. Third item');
+    });
+
+    it('should convert nested lists', async () => {
+      const html = `
+        <ul>
+          <li>Parent 1
+            <ul>
+              <li>Child 1.1</li>
+              <li>Child 1.2</li>
+            </ul>
+          </li>
+          <li>Parent 2</li>
+        </ul>
+      `;
+      const result = await converter.convert(html);
+      expect(result).toContain('- Parent 1');
+      expect(result).toMatch(/\s+- Child 1\.1/);
+      expect(result).toMatch(/\s+- Child 1\.2/);
+      expect(result).toContain('- Parent 2');
+    });
+
+    it('should convert links', async () => {
+      const html = `
+        <p><a href="https://example.com">External link</a></p>
+        <p><a href="/wiki/page">Internal link</a></p>
+      `;
+      const result = await converter.convert(html);
+      expect(result).toContain('[External link](https://example.com)');
+      expect(result).toContain('[Internal link](/wiki/page)');
+    });
+
+    it('should convert code blocks', async () => {
+      const html = `
+        <pre><code class="language-javascript">function hello() {
+  console.log("Hello, World!");
+}</code></pre>
+      `;
+      const result = await converter.convert(html);
+      expect(result).toContain('```javascript');
+      expect(result).toContain('function hello()');
+      expect(result).toContain('console.log("Hello, World!")');
+      expect(result).toContain('```');
+    });
+
+    it('should convert Confluence code macro', async () => {
+      const confluenceHtml = `
+        <ac:structured-macro ac:name="code">
+          <ac:parameter ac:name="language">python</ac:parameter>
+          <ac:plain-text-body><![CDATA[def hello():
+    print("Hello, World!")]]></ac:plain-text-body>
+        </ac:structured-macro>
+      `;
+      const result = await converter.convert(confluenceHtml);
+      expect(result).toContain('```python');
+      expect(result).toContain('def hello():');
+      expect(result).toContain('print("Hello, World!")');
+      expect(result).toContain('```');
+    });
+
+    it('should convert Confluence inline code', async () => {
+      const confluenceHtml = `
+        <p>Use the <ac:structured-macro ac:name="code">
+          <ac:plain-text-body><![CDATA[npm install]]></ac:plain-text-body>
+        </ac:structured-macro> command</p>
+      `;
+      const result = await converter.convert(confluenceHtml);
+      expect(result).toContain('`npm install`');
+    });
+
+    it('should convert Confluence links', async () => {
+      const confluenceHtml = `
+        <ac:link>
+          <ri:page ri:content-title="Other Page"/>
+          <ac:plain-text-link-body><![CDATA[Link to other page]]></ac:plain-text-link-body>
+        </ac:link>
+      `;
+      const result = await converter.convert(confluenceHtml);
+      expect(result).toContain('[Link to other page](<#Other Page>)');
+    });
+
+    it('should convert Confluence emoticons', async () => {
+      const confluenceHtml = `
+        <p>Good job <ac:emoticon ac:name="thumbs-up"/> and be careful <ac:emoticon ac:name="warning"/></p>
+      `;
+      const result = await converter.convert(confluenceHtml);
+      expect(result).toContain('👍');
+      expect(result).toContain('⚠️');
+    });
+
+    it('should handle Confluence layout elements', async () => {
+      const confluenceHtml = `
+        <ac:layout>
+          <ac:layout-section>
+            <ac:layout-cell>
+              <p>Content in layout</p>
+            </ac:layout-cell>
+          </ac:layout-section>
+        </ac:layout>
+      `;
+      const result = await converter.convert(confluenceHtml);
+      expect(result).toContain('Content in layout');
+      expect(result).not.toContain('ac:layout');
+    });
+
+    it('should clean up excessive blank lines', async () => {
+      const html = `
+        <h1>Title</h1>
+
+
+
+        <p>Paragraph</p>
+
+
+
+        <h2>Subtitle</h2>
+      `;
+      const result = await converter.convert(html);
+      // Should have max 2 consecutive newlines
+      expect(result).not.toMatch(/\n{3,}/);
+    });
+
+    it('should ensure headers have blank lines around them', async () => {
+      const html = '<p>Text before</p><h2>Header</h2><p>Text after</p>';
+      const result = await converter.convert(html);
+      expect(result).toMatch(/Text before\n\n## Header\n\n/);
+    });
+
+    it('should normalize list markers', async () => {
+      const html = `
+        <ul>
+          <li>Item with asterisk</li>
+          <li>Item with plus</li>
+          <li>Item with dash</li>
+        </ul>
+      `;
+      const result = await converter.convert(html);
+      // All list items should use dash
+      const lines = result.split('\n');
+      const listLines = lines.filter(line => line.trim().startsWith('-'));
+      expect(listLines).toHaveLength(3);
+    });
+
+    it('should handle complex nested content', async () => {
+      const html = `
+        <h1>Main Title</h1>
+        <p>Introduction with <strong>bold</strong> and <em>italic</em> text.</p>
+        <h2>Section 1</h2>
+        <ul>
+          <li>Point 1 with <code>inline code</code></li>
+          <li>Point 2
+            <ol>
+              <li>Subpoint A</li>
+              <li>Subpoint B</li>
+            </ol>
+          </li>
+        </ul>
+        <pre><code>Code block
+with multiple lines</code></pre>
+        <p>Conclusion with a <a href="https://example.com">link</a>.</p>
+      `;
+      const result = await converter.convert(html);
+
+      expect(result).toContain('# Main Title');
+      expect(result).toContain('**bold**');
+      expect(result).toContain('*italic*');
+      expect(result).toContain('## Section 1');
+      expect(result).toContain('`inline code`');
+      expect(result).toContain('1. Subpoint A');
+      expect(result).toContain('```');
+      expect(result).toContain('[link](https://example.com)');
+    });
+
+    it('should handle malformed HTML gracefully', async () => {
+      const malformedHtml = '<p>Unclosed paragraph <strong>bold text</p>';
+      const result = await converter.convert(malformedHtml);
+      expect(result).toContain('Unclosed paragraph');
+      expect(result).toContain('bold text');
+    });
+
+    it('should escape HTML entities correctly', async () => {
+      const html = '<p>&lt;script&gt;alert("XSS")&lt;/script&gt;</p>';
+      const result = await converter.convert(html);
+      expect(result).toContain('\\<script>alert("XSS")\\</script>');
+    });
+  });
+});

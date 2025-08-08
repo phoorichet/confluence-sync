@@ -29,11 +29,70 @@ This is a TypeScript project for syncing with Confluence API, built with Bun run
 
 ## Architecture
 
+### High Level Overview
+
+1. **Architectural Style:** Modular Monolith with plugin-ready architecture - single deployable unit with well-defined internal module boundaries
+2. **Repository Structure:** Monorepo as specified in PRD - all components in single repository for atomic commits and simplified dependency management
+3. **Service Architecture:** Monolithic CLI application with internal service modules for commands, sync engine, API client, and converters
+4. **Primary Flow:** User → CLI Command → Command Handler → Business Logic (Sync Engine) → API Client/Storage → Confluence API
+5. **Key Decisions:**
+   - Layered architecture for clear separation of concerns
+   - Plugin hooks for future extensibility without breaking core
+   - Local-first with optimistic operations and conflict detection
+   - Async/concurrent operations using Bun's native capabilities
+
+### High Level Project Diagram
+
+```mermaid
+graph TD
+    User[User/Developer]
+    CLI[CLI Interface<br/>Commander.js]
+    CH[Command Handlers]
+    SE[Sync Engine]
+    CM[Converter Module]
+    AC[API Client<br/>openapi-fetch]
+    SM[Storage Manager]
+    MF[Manifest File<br/>.confluence-sync.json]
+    CA[Confluence API]
+    FS[Local Filesystem<br/>Markdown Files]
+    KC[Keychain<br/>keytar]
+
+    User -->|commands| CLI
+    CLI --> CH
+    CH --> SE
+    SE --> CM
+    SE --> AC
+    SE --> SM
+    SM --> MF
+    SM --> FS
+    AC -->|HTTPS| CA
+    CH -->|auth| KC
+
+    style CLI fill:#e1f5fe
+    style SE fill:#fff3e0
+    style AC fill:#f3e5f5
+    style CA fill:#ffebee
+```
+
+### Architectural and Design Patterns
+
+- **Command Pattern:** Each CLI command (pull, push, sync, auth) implemented as discrete command handler with validation, execution, and error handling - *Rationale:* Clear separation of CLI concerns from business logic, testability, and future command additions
+
+- **Repository Pattern:** Abstract data access for manifest and local file operations behind repository interfaces - *Rationale:* Enables testing with mock implementations and potential future migration to SQLite for performance
+
+- **Strategy Pattern:** Format converters (Markdown ↔ Confluence) implemented as pluggable strategies - *Rationale:* Supports future format additions (AsciiDoc, HTML) without modifying core sync logic
+
+- **Observer Pattern:** Event-driven notifications for sync progress and conflict detection - *Rationale:* Enables progress bars, logging, and future webhook integrations without coupling
+
+- **Circuit Breaker Pattern:** API client implements circuit breaker for Confluence API calls - *Rationale:* Prevents cascade failures and respects rate limits automatically
+
+- **Unit of Work Pattern:** Sync operations tracked as atomic units with rollback capability - *Rationale:* Ensures consistency during multi-file operations and enables recovery from partial failures
+
 ### Key Files
-- `src/index.ts` - Auto-generated OpenAPI types (DO NOT EDIT MANUALLY - use `gen:openapi`)
-- `src/api-client.ts` - Creates typed OpenAPI fetch client using openapi-fetch
+- `src/api/types.ts` - Auto-generated OpenAPI types (DO NOT EDIT MANUALLY - use `gen:openapi`)
+- `src/api/client.ts` - Creates typed OpenAPI fetch client using openapi-fetch
 - `src/cli.ts` - CLI entry point (currently minimal implementation)
-- `src/openapi.json` - Confluence OpenAPI specification (updated via `download:openapi`)
+- `src/openapi/confluence-openapi.json` - Confluence OpenAPI specification (updated via `download:openapi`)
 
 ### Build System
 - Uses `zshy` bundler-free TypeScript build tool

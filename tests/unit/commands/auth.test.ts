@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Command } from 'commander';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthManager } from '../../../src/auth/auth-manager';
 import authCommand from '../../../src/commands/auth';
 
@@ -23,7 +23,7 @@ describe('auth command', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     mockAuthManager = {
       authenticate: vi.fn(),
       getCurrentUser: vi.fn(),
@@ -32,17 +32,17 @@ describe('auth command', () => {
       clearCredentials: vi.fn(),
       getToken: vi.fn(),
     };
-    
+
     vi.mocked(AuthManager).getInstance = vi.fn().mockReturnValue(mockAuthManager);
-    
+
     program = new Command();
     program.addCommand(authCommand);
-    
+
     mockConsole = {
       log: vi.spyOn(console, 'log').mockImplementation(() => {}),
       error: vi.spyOn(console, 'error').mockImplementation(() => {}),
     };
-    
+
     vi.spyOn(process, 'exit').mockImplementation((code) => {
       throw new Error(`Process exited with code ${code}`);
     });
@@ -54,7 +54,7 @@ describe('auth command', () => {
         token: 'test-token',
         type: 'basic',
       });
-      
+
       mockAuthManager.getCurrentUser.mockResolvedValue({
         displayName: 'Test User',
         email: 'test@example.com',
@@ -85,7 +85,7 @@ describe('auth command', () => {
         token: 'pat-token',
         type: 'bearer',
       });
-      
+
       mockAuthManager.getCurrentUser.mockResolvedValue({
         displayName: 'Test User',
       });
@@ -124,7 +124,7 @@ describe('auth command', () => {
           'test@example.com',
           '--token',
           'invalid-token',
-        ])
+        ]),
       ).rejects.toThrow('Process exited with code 1');
 
       expect(mockConsole.error).toHaveBeenCalled();
@@ -138,9 +138,9 @@ describe('auth command', () => {
         username: 'test@example.com',
         authType: 'cloud',
       });
-      
+
       mockAuthManager.validateAuth.mockResolvedValue(true);
-      
+
       mockAuthManager.getCurrentUser.mockResolvedValue({
         displayName: 'Test User',
         email: 'test@example.com',
@@ -166,7 +166,7 @@ describe('auth command', () => {
         username: 'test@example.com',
         authType: 'cloud',
       });
-      
+
       mockAuthManager.validateAuth.mockResolvedValue(false);
 
       await program.parseAsync(['node', 'test', 'auth', 'status']);
@@ -183,10 +183,10 @@ describe('auth command', () => {
         username: 'test@example.com',
         authType: 'cloud',
       });
-      
+
       const inquirer = await import('inquirer');
       vi.mocked(inquirer.default.prompt).mockResolvedValue({ confirm: true });
-      
+
       mockAuthManager.clearCredentials.mockResolvedValue(undefined);
 
       await program.parseAsync(['node', 'test', 'auth', 'clear']);
@@ -200,7 +200,7 @@ describe('auth command', () => {
         username: 'test@example.com',
         authType: 'cloud',
       });
-      
+
       const inquirer = await import('inquirer');
       vi.mocked(inquirer.default.prompt).mockResolvedValue({ confirm: false });
 
