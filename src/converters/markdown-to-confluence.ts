@@ -142,59 +142,152 @@ export class MarkdownToConfluenceConverter {
         const title = (node as any).title || '';
 
         // Check if it's an internal link (to another Confluence page)
-        if (url.startsWith('#') || url.startsWith('/wiki/')) {
-          // Internal Confluence link - would need page ID in real scenario
-          htmlParts.push(`<a href="${this.escapeHtml(url)}">`);
+        if (url.startsWith('#')) {
+          // Anchor link within the same page
+          htmlParts.push(
+            `<ac:link ac:anchor="${this.escapeHtml(url.substring(1))}">`
+            + `<ac:plain-text-link-body><![CDATA[`,
+          );
+          if ('children' in node) {
+            (node as any).children.forEach((child: any) => {
+              if (child.type === 'text') {
+                htmlParts.push(child.value);
+              }
+            });
+          }
+          htmlParts.push(`]]></ac:plain-text-link-body></ac:link>`);
+        }
+        else if (url.startsWith('/wiki/') || url.match(/^[^:]+\.md$/)) {
+          // Internal Confluence link - treating .md files as internal pages
+          const pageName = url.replace(/^\/wiki\//, '').replace(/\.md$/, '');
+          htmlParts.push(
+            `<ac:link>`
+            + `<ri:page ri:content-title="${this.escapeHtml(pageName)}" />`
+            + `<ac:plain-text-link-body><![CDATA[`,
+          );
+          if ('children' in node) {
+            (node as any).children.forEach((child: any) => {
+              if (child.type === 'text') {
+                htmlParts.push(child.value);
+              }
+            });
+          }
+          htmlParts.push(`]]></ac:plain-text-link-body></ac:link>`);
         }
         else {
           // External link
           htmlParts.push(`<a href="${this.escapeHtml(url)}"${title ? ` title="${this.escapeHtml(title)}"` : ''}>`);
+          if ('children' in node) {
+            (node as any).children.forEach((child: any) => this.visitNode(child, htmlParts));
+          }
+          htmlParts.push('</a>');
         }
-
-        if ('children' in node) {
-          (node as any).children.forEach((child: any) => this.visitNode(child, htmlParts));
-        }
-        htmlParts.push('</a>');
         break;
       }
 
       case 'image': {
         const src = (node as any).url;
-        // const alt = (node as any).alt || '';
-        // const imageTitle = (node as any).title || '';
+        const alt = (node as any).alt || '';
+        const imageTitle = (node as any).title || '';
 
-        // In Confluence, images are typically attachments
-        // For now, we'll use a simple img tag, but in production
-        // this would need to handle attachment uploads
-        htmlParts.push(
-          `<ac:image>`
-          + `<ri:attachment ri:filename="${this.getFilenameFromUrl(src)}" />`
-          + `</ac:image>`,
-        );
+        // Handle different image source types
+        if (src.startsWith('http://') || src.startsWith('https://')) {
+          // External image - use URL directly
+          htmlParts.push(
+            `<ac:image>`
+            + `<ri:url ri:value="${this.escapeHtml(src)}" />${
+              alt ? `<ac:caption>${this.escapeHtml(alt)}</ac:caption>` : ''
+            }</ac:image>`,
+          );
+        }
+        else {
+          // Local image - treat as attachment (preserve relative path)
+          const filename = this.getFilenameFromUrl(src);
+          htmlParts.push(
+            `<ac:image${imageTitle ? ` ac:title="${this.escapeHtml(imageTitle)}"` : ''}>`
+            + `<ri:attachment ri:filename="${this.escapeHtml(filename)}" />${
+              alt ? `<ac:caption>${this.escapeHtml(alt)}</ac:caption>` : ''
+            }</ac:image>`,
+          );
+        }
         break;
       }
 
-      case 'blockquote':
-        htmlParts.push('<blockquote>');
-        if ('children' in node) {
-          (node as any).children.forEach((child: any) => this.visitNode(child, htmlParts));
+      case 'blockquote': {
+        // Check if this is a special panel-type blockquote
+        const firstChild = (node as any).children?.[0];
+        let isPanelBlockquote = false;
+        let panelType = 'note';
+
+        if (firstChild?.type === 'paragraph' && firstChild.children?.[0]?.type === 'text') {
+          const text = firstChild.children[0].value;
+          const panelMatch = text.match(/^\[!(INFO|WARNING|NOTE|TIP)\]/);
+          if (panelMatch) {
+            isPanelBlockquote = true;
+            panelType = panelMatch[1].toLowerCase();
+            // Remove the marker from the text
+            firstChild.children[0].value = text.replace(/^\[!(INFO|WARNING|NOTE|TIP)\]\s*/, '');
+          }
         }
-        htmlParts.push('</blockquote>');
+
+        if (isPanelBlockquote) {
+          htmlParts.push(
+            `<ac:structured-macro ac:name="${panelType}">`
+            + `<ac:rich-text-body>`,
+          );
+          if ('children' in node) {
+            (node as any).children.forEach((child: any) => this.visitNode(child, htmlParts));
+          }
+          htmlParts.push(
+            `</ac:rich-text-body>`
+            + `</ac:structured-macro>`,
+          );
+        }
+        else {
+          htmlParts.push('<blockquote>');
+          if ('children' in node) {
+            (node as any).children.forEach((child: any) => this.visitNode(child, htmlParts));
+          }
+          htmlParts.push('</blockquote>');
+        }
         break;
+      }
 
       case 'thematicBreak':
         htmlParts.push('<hr/>');
         break;
 
-      case 'table':
-        htmlParts.push('<table><tbody>');
-        if ('children' in node) {
-          (node as any).children.forEach((child: any, index: number) => {
-            this.visitTableRow(child, htmlParts, index === 0);
-          });
+      case 'table': {
+        // Check if table has headers (first row is header if followed by separator)
+        const hasHeader = (node as any).children?.length > 1;
+
+        if (hasHeader) {
+          htmlParts.push('<table><thead>');
+          // First row is header
+          this.visitTableRow((node as any).children[0], htmlParts, true);
+          htmlParts.push('</thead><tbody>');
+          // Rest are body rows (skip separator row at index 1 if exists)
+          for (let i = 1; i < (node as any).children.length; i++) {
+            // Skip separator rows in markdown (they don't translate to HTML)
+            if (!this.isTableSeparatorRow((node as any).children[i])) {
+              this.visitTableRow((node as any).children[i], htmlParts, false);
+            }
+          }
+          htmlParts.push('</tbody></table>');
         }
-        htmlParts.push('</tbody></table>');
+        else {
+          htmlParts.push('<table><tbody>');
+          if ('children' in node) {
+            (node as any).children.forEach((child: any) => {
+              if (!this.isTableSeparatorRow(child)) {
+                this.visitTableRow(child, htmlParts, false);
+              }
+            });
+          }
+          htmlParts.push('</tbody></table>');
+        }
         break;
+      }
 
       case 'tableRow':
         // Handled by visitTableRow
@@ -250,5 +343,27 @@ export class MarkdownToConfluenceConverter {
     // Extract filename from URL or path
     const parts = url.split('/');
     return parts[parts.length - 1] || 'image';
+  }
+
+  /**
+   * Check if a table row is just a separator (markdown table formatting)
+   */
+  private isTableSeparatorRow(row: any): boolean {
+    if (!row || row.type !== 'tableRow' || !row.children) {
+      return false;
+    }
+
+    // Check if all cells contain only dashes and colons (separator syntax)
+    return row.children.every((cell: any) => {
+      if (!cell.children || cell.children.length === 0)
+        return true;
+
+      const content = cell.children
+        .filter((child: any) => child.type === 'text')
+        .map((child: any) => child.value)
+        .join('');
+
+      return /^:?-+:?$/.test(content.trim());
+    });
   }
 }

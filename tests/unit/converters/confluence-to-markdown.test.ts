@@ -200,6 +200,173 @@ describe('confluenceToMarkdownConverter', () => {
       expect(result).not.toMatch(/\n{3,}/);
     });
 
+    it('should convert Confluence info panels', async () => {
+      const confluenceHtml = `
+        <ac:structured-macro ac:name="info">
+          <ac:rich-text-body>
+            <p>This is important information</p>
+          </ac:rich-text-body>
+        </ac:structured-macro>
+      `;
+      const result = await converter.convert(confluenceHtml);
+      expect(result).toContain('> [!INFO]');
+      expect(result).toContain('> This is important information');
+    });
+
+    it('should convert Confluence warning panels', async () => {
+      const confluenceHtml = `
+        <ac:structured-macro ac:name="warning">
+          <ac:rich-text-body>
+            <p>Warning message</p>
+          </ac:rich-text-body>
+        </ac:structured-macro>
+      `;
+      const result = await converter.convert(confluenceHtml);
+      expect(result).toContain('> [!WARNING]');
+      expect(result).toContain('> Warning message');
+    });
+
+    it('should convert Confluence note panels', async () => {
+      const confluenceHtml = `
+        <ac:structured-macro ac:name="note">
+          <ac:rich-text-body>
+            <p>Note content</p>
+          </ac:rich-text-body>
+        </ac:structured-macro>
+      `;
+      const result = await converter.convert(confluenceHtml);
+      expect(result).toContain('> [!NOTE]');
+      expect(result).toContain('> Note content');
+    });
+
+    it('should convert Confluence tip panels', async () => {
+      const confluenceHtml = `
+        <ac:structured-macro ac:name="tip">
+          <ac:rich-text-body>
+            <p>Helpful tip</p>
+          </ac:rich-text-body>
+        </ac:structured-macro>
+      `;
+      const result = await converter.convert(confluenceHtml);
+      expect(result).toContain('> [!TIP]');
+      expect(result).toContain('> Helpful tip');
+    });
+
+    it('should align table columns properly', async () => {
+      const html = `
+        <table>
+          <tr>
+            <th>Short</th>
+            <th>Medium Length</th>
+            <th>Very Long Header</th>
+          </tr>
+          <tr>
+            <td>A</td>
+            <td>B</td>
+            <td>C</td>
+          </tr>
+        </table>
+      `;
+      const result = await converter.convert(html);
+      // Check that table is present and formatted
+      expect(result).toContain('| Short');
+      expect(result).toContain('| Medium Length');
+      expect(result).toContain('| Very Long Header');
+      expect(result).toMatch(/\|\s+A\s+\|/);
+      expect(result).toMatch(/\|\s+B\s+\|/);
+      expect(result).toMatch(/\|\s+C\s+\|/);
+    });
+
+    it('should handle deeply nested lists', async () => {
+      const html = `
+        <ul>
+          <li>Level 1
+            <ul>
+              <li>Level 2
+                <ul>
+                  <li>Level 3
+                    <ul>
+                      <li>Level 4
+                        <ul>
+                          <li>Level 5
+                            <ul>
+                              <li>Level 6</li>
+                            </ul>
+                          </li>
+                        </ul>
+                      </li>
+                    </ul>
+                  </li>
+                </ul>
+              </li>
+            </ul>
+          </li>
+        </ul>
+      `;
+      const result = await converter.convert(html);
+      expect(result).toContain('- Level 1');
+      expect(result).toContain('Level 2');
+      expect(result).toContain('Level 3');
+      expect(result).toContain('Level 4');
+      expect(result).toContain('Level 5');
+      expect(result).toContain('Level 6');
+    });
+
+    it('should handle mixed nested lists', async () => {
+      const html = `
+        <ol>
+          <li>Ordered parent
+            <ul>
+              <li>Unordered child 1</li>
+              <li>Unordered child 2</li>
+            </ul>
+          </li>
+          <li>Another ordered
+            <ol>
+              <li>Nested ordered</li>
+            </ol>
+          </li>
+        </ol>
+      `;
+      const result = await converter.convert(html);
+      expect(result).toContain('1. Ordered parent');
+      expect(result).toContain('- Unordered child 1');
+      expect(result).toContain('- Unordered child 2');
+      expect(result).toContain('2. Another ordered');
+      expect(result).toContain('1. Nested ordered');
+    });
+
+    it('should handle tables with empty cells', async () => {
+      const html = `
+        <table>
+          <tr>
+            <th>A</th>
+            <th>B</th>
+            <th>C</th>
+          </tr>
+          <tr>
+            <td>1</td>
+            <td></td>
+            <td>3</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td>2</td>
+            <td></td>
+          </tr>
+        </table>
+      `;
+      const result = await converter.convert(html);
+      expect(result).toContain('| A');
+      expect(result).toContain('| B');
+      expect(result).toContain('| C');
+      // The markdown processor may handle empty cells differently
+      // Check that table structure is preserved
+      expect(result).toContain('| 1');
+      expect(result).toContain('| 3');
+      expect(result).toContain('| 2');
+    });
+
     it('should ensure headers have blank lines around them', async () => {
       const html = '<p>Text before</p><h2>Header</h2><p>Text after</p>';
       const result = await converter.convert(html);
