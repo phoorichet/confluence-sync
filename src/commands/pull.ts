@@ -62,12 +62,13 @@ export const pullCommand = new Command('pull')
 
       // Success message
       progress.stop();
+      logger.info('Pull operation completed successfully');
       console.log(chalk.green('✓'), 'Pull operation completed successfully');
     }
     catch (error: any) {
       progress.stop();
       logger.error('Pull command failed', error);
-      // Using console.error for CLI output is acceptable for user-facing error messages
+      // Console output for CLI user feedback
       console.error(chalk.red('✗'), error.message);
       process.exit(1);
     }
@@ -180,6 +181,7 @@ async function pullSpace(spaceKey: string, outputDir: string, progress: any): Pr
   }
 
   if (allPages.length === 0) {
+    logger.warn(`No pages found in space ${spaceKey}`);
     console.log(chalk.yellow('⚠'), `No pages found in space ${spaceKey}`);
     return;
   }
@@ -219,29 +221,49 @@ async function pullSpace(spaceKey: string, outputDir: string, progress: any): Pr
 
   progress.update(`Processing ${allPages.length} pages...`);
 
-  // Process pages with concurrency limit
+  // Track failed pages for reporting
+  const failedPages: Array<{ page: PageBulk; error: Error }> = [];
+  let processedCount = 0;
+
+  // Process pages with concurrency limit and error recovery
   const concurrencyLimit = pLimit(5);
   const tasks = allPages.map(page =>
     concurrencyLimit(async () => {
-      progress.update(`Processing page: ${page.title}`);
+      try {
+        progress.update(`Processing page: ${page.title} (${++processedCount}/${allPages.length})`);
 
-      // Build the full path from the page to the root
-      let parentPath: string | undefined;
-      if (page.parentId) {
-        const pathSegments = buildFullPath(page.parentId, allPages, folders);
-        parentPath = pathSegments.length > 0 ? path.join(...pathSegments) : undefined;
+        // Build the full path from the page to the root
+        let parentPath: string | undefined;
+        if (page.parentId) {
+          const pathSegments = buildFullPath(page.parentId, allPages, folders);
+          parentPath = pathSegments.length > 0 ? path.join(...pathSegments) : undefined;
+        }
+
+        // Check if page has children
+        const hasChildren = allPages.some(p => p.parentId === page.id);
+        const isHomepageId = page.id === space.homepageId;
+
+        await savePage(page, outputDir, null, spaceKey, parentPath, hasChildren, page.position, isHomepageId);
       }
-
-      // Check if page has children
-      const hasChildren = allPages.some(p => p.parentId === page.id);
-      const isHomepageId = page.id === space.homepageId;
-
-      await savePage(page, outputDir, null, spaceKey, parentPath, hasChildren, page.position, isHomepageId);
+      catch (error: any) {
+        logger.error(`Failed to process page ${page.title} (${page.id}): ${error.message}`);
+        failedPages.push({ page, error });
+      }
     }),
   );
 
   await Promise.all(tasks);
 
+  // Report failed pages if any
+  if (failedPages.length > 0) {
+    logger.warn(`${failedPages.length} pages failed to process:`);
+    for (const { page, error } of failedPages) {
+      logger.warn(`  - ${page.title} (${page.id}): ${error.message}`);
+    }
+    console.log(chalk.yellow('⚠'), `${failedPages.length} pages failed to process. Check logs for details.`);
+  }
+
+  logger.info(`Successfully pulled ${allPages.length} pages from space ${spaceKey}`);
   console.log(chalk.green('✓'), `Successfully pulled ${allPages.length} pages from space ${spaceKey}`);
 }
 
@@ -265,7 +287,6 @@ async function pullPageRecursive(
   if (!page) {
     throw new Error(`CS-404: Page with ID ${pageId} not found`);
   }
-  console.log('---> page', page);
 
   await savePage(page, outputDir, progress);
 
@@ -274,17 +295,30 @@ async function pullPageRecursive(
   const children = await apiClient.getPageChildren(pageId);
 
   if (children.length > 0) {
+    logger.info(`Found ${children.length} child pages for page ${pageId}`);
     console.log(chalk.gray(`  Found ${children.length} child pages`));
 
-    // Process children with concurrency limit
+    // Process children with concurrency limit and error recovery
     const concurrencyLimit = pLimit(5);
+    const failedChildren: string[] = [];
+
     const tasks = children.map(child =>
       concurrencyLimit(async () => {
-        await pullPageRecursive(child?.id || '', outputDir, maxDepth, progress, currentDepth + 1);
+        try {
+          await pullPageRecursive(child?.id || '', outputDir, maxDepth, progress, currentDepth + 1);
+        }
+        catch (error: any) {
+          logger.error(`Failed to pull child page ${child?.id}: ${error.message}`);
+          failedChildren.push(child?.id || 'unknown');
+        }
       }),
     );
 
     await Promise.all(tasks);
+
+    if (failedChildren.length > 0) {
+      logger.warn(`Failed to pull ${failedChildren.length} child pages of ${pageId}`);
+    }
   }
 }
 
@@ -359,6 +393,7 @@ async function savePage(
   });
 
   if (progress) {
+    logger.debug(`Saved page: ${pageTitle} to ${filePath}`);
     console.log(chalk.gray('  ✓'), `Saved: ${pageTitle}`);
   }
 }

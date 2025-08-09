@@ -110,11 +110,10 @@ graph TD
 ## Important Notes
 - The project uses Bun runtime with Node.js import syntax (e.g., `node:fs`, `node:path`)
 - Always use Node.js-style imports: `import { readFileSync } from 'node:fs'` not `import { readFileSync } from 'fs'`
-- src/index.ts is auto-generated - never edit it directly
-- API client is configured to use http://localhost:8787 as base URL
 - After any code changes, run `bun run build` to update dist/ directory
 - The dist/ directory contains:
   - CommonJS files (.cjs)
   - ES modules (.js)
   - TypeScript declarations (.d.ts, .d.cts)
 - package.json is automatically updated by zshy during build process
+- DO NOT add a new type or interface in `src/api/client.ts` - use them from `src/api/types.ts` instead
