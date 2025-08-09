@@ -109,11 +109,20 @@ bun run cli push ./docs/child.md --parent-id 987654321 --title "Child Page"
 #### Push Multiple Files
 
 ```bash
-# Push all Markdown files in a directory
-bun run cli push ./docs --space MYSPACE
+# Push all Markdown files in a directory (bulk hierarchy push)
+bun run cli push ./docs --recursive --space MYSPACE
 
-# Push with pattern matching
-bun run cli push ./docs --pattern "**/*.md" --space MYSPACE
+# The tool will:
+# 1. Scan the directory structure
+# 2. Create parent pages before children
+# 3. Maintain the hierarchy in Confluence
+# 4. Report any failed pages at the end
+
+# Example: Push a documentation directory
+bun run cli push ./documentation --recursive --space DOCS
+
+# With a specific parent page
+bun run cli push ./docs/guides --recursive --parent-id 123456789
 ```
 
 ### Sync Commands

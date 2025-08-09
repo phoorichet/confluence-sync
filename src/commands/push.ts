@@ -5,46 +5,68 @@ import process from 'node:process';
 import chalk from 'chalk';
 import { Command } from 'commander';
 import * as diff from 'diff';
+import { glob } from 'glob';
 import ora from 'ora';
+import pLimit from 'p-limit';
 import { apiClient, type PageSingle } from '../api/client';
 import { ConfluenceToMarkdownConverter } from '../converters/confluence-to-markdown';
 import { MarkdownToConfluenceConverter } from '../converters/markdown-to-confluence';
 import { BackupManager } from '../storage/backup-manager';
 import { FileManager } from '../storage/file-manager';
+import { HierarchyManager } from '../storage/hierarchy-manager';
 import { ManifestManager } from '../storage/manifest-manager';
 import { ConflictResolver } from '../sync/conflict-resolver';
 import { logger } from '../utils/logger';
+import { createProgress } from '../utils/progress';
 
 interface PushOptions {
   dryRun?: boolean;
   forceLocal?: boolean;
   forceRemote?: boolean;
+  spaceKey?: string;
+  parentId?: string;
+  recursive?: boolean;
 }
 
 export const pushCommand = new Command('push')
   .description('Push local Markdown changes to Confluence')
-  .argument('<file>', 'Markdown file to push')
+  .argument('<path>', 'Markdown file or directory to push')
   .option('--dry-run', 'Preview changes without actually pushing')
   .option('--force-local', 'Force local version in case of conflicts')
   .option('--force-remote', 'Force remote version in case of conflicts')
-  .action(async (file: string, options: PushOptions) => {
+  .option('-s, --space <key>', 'Space key for creating new pages')
+  .option('-p, --parent-id <id>', 'Parent page ID for creating child pages')
+  .option('-r, --recursive', 'Recursively push directory structure')
+  .action(async (inputPath: string, options: PushOptions) => {
     const spinner = ora();
+    const progress = createProgress();
 
     try {
-      // Validate file path parameter exists and is readable
-      const absolutePath = path.resolve(file);
+      // Validate path parameter exists and is readable
+      const absolutePath = path.resolve(inputPath);
 
       if (!fs.existsSync(absolutePath)) {
-        throw new Error(`CS-404: File not found: ${file}`);
+        throw new Error(`CS-404: Path not found: ${inputPath}`);
       }
 
       const stats = fs.statSync(absolutePath);
+      
+      // Check if it's a directory - if so, handle bulk push
+      if (stats.isDirectory()) {
+        if (!options.recursive) {
+          throw new Error(`CS-400: Directory push requires --recursive flag: ${inputPath}`);
+        }
+        await pushDirectory(absolutePath, options, progress);
+        return;
+      }
+      
+      // Single file push logic continues below
       if (!stats.isFile()) {
-        throw new Error(`CS-400: Path is not a file: ${file}`);
+        throw new Error(`CS-400: Path is not a file or directory: ${inputPath}`);
       }
 
       if (!absolutePath.endsWith('.md')) {
-        throw new Error(`CS-400: File must be a Markdown file (.md): ${file}`);
+        throw new Error(`CS-400: File must be a Markdown file (.md): ${inputPath}`);
       }
 
       // Load manifest to get page metadata
@@ -60,7 +82,7 @@ export const pushCommand = new Command('push')
 
       if (!page) {
         spinner.fail();
-        throw new Error(`CS-404: File not tracked in manifest. Please pull the page first: ${file}`);
+        throw new Error(`CS-404: File not tracked in manifest. Please pull the page first: ${inputPath}`);
       }
 
       spinner.succeed('Page metadata loaded');
@@ -250,7 +272,7 @@ export const pushCommand = new Command('push')
       console.error(chalk.red(`\n✗ Push failed: ${error.message}`));
 
       logger.error('Push command failed', {
-        file,
+        path: inputPath,
         error: error.message,
         stack: error.stack,
       });
@@ -258,3 +280,305 @@ export const pushCommand = new Command('push')
       process.exit(1);
     }
   });
+
+// Helper function to push an entire directory structure
+async function pushDirectory(
+  dirPath: string,
+  options: PushOptions,
+  progress: any,
+): Promise<void> {
+  progress.start('Scanning directory structure...');
+  
+  // Find all markdown files in the directory
+  const pattern = path.join(dirPath, '**/*.md');
+  const files = await glob(pattern, { absolute: true });
+  
+  if (files.length === 0) {
+    progress.stop();
+    throw new Error(`CS-404: No Markdown files found in directory: ${dirPath}`);
+  }
+  
+  progress.update(`Found ${files.length} Markdown files`);
+  
+  // Parse the directory structure to determine hierarchy
+  const hierarchyManager = HierarchyManager.getInstance();
+  const fileStructure = hierarchyManager.parseDirectoryStructure(dirPath, files);
+  
+  // Build a hierarchy tree from the files
+  const pageHierarchy = buildPageHierarchy(dirPath, files, fileStructure);
+  
+  // Initialize API client
+  await apiClient.initialize();
+  
+  // Load manifest
+  const manifestManager = ManifestManager.getInstance();
+  const manifest = await manifestManager.load();
+  
+  // Check if we need a space key
+  if (!options.spaceKey && !options.parentId) {
+    // Try to find space key from existing pages in manifest
+    const existingPages = Array.from(manifest.pages.values());
+    if (existingPages.length > 0 && existingPages[0]) {
+      options.spaceKey = existingPages[0].spaceKey;
+      logger.info(`Using space key from manifest: ${options.spaceKey}`);
+    } else {
+      throw new Error('CS-400: Space key (--space) or parent ID (--parent-id) required for new pages');
+    }
+  }
+  
+  // Process pages in hierarchical order (parents before children)
+  const processedPages = new Map<string, string>(); // localPath -> pageId
+  const failedPages: Array<{ path: string; error: Error }> = [];
+  
+  progress.update('Processing pages in hierarchical order...');
+  
+  // Sort files to ensure parents are processed before children
+  const sortedFiles = sortFilesByHierarchy(dirPath, files);
+  
+  // Process with concurrency limit - but maintain parent-child order
+  const concurrencyLimit = pLimit(3); // Lower limit for push operations
+  let processedCount = 0;
+  
+  // Group files by depth for sequential processing of each level
+  const filesByDepth = new Map<number, string[]>();
+  for (const filePath of sortedFiles) {
+    const relativePath = path.relative(dirPath, filePath);
+    const depth = relativePath.split(path.sep).length;
+    if (!filesByDepth.has(depth)) {
+      filesByDepth.set(depth, []);
+    }
+    filesByDepth.get(depth)!.push(filePath);
+  }
+  
+  // Process each depth level sequentially, but files within a level concurrently
+  const sortedDepths = Array.from(filesByDepth.keys()).sort((a, b) => a - b);
+  
+  for (const depth of sortedDepths) {
+    const filesAtDepth = filesByDepth.get(depth)!;
+    
+    // Process all files at this depth level concurrently
+    const promises = filesAtDepth.map(filePath =>
+      concurrencyLimit(async () => {
+        try {
+          const relativePath = path.relative(dirPath, filePath);
+          progress.update(`Processing (${++processedCount}/${files.length}): ${relativePath}`);
+          
+          // Determine parent ID based on directory structure
+          const parentDir = path.dirname(filePath);
+          const parentDirRelative = path.relative(dirPath, parentDir);
+          let actualParentId = options.parentId;
+          
+          // Check if this file's parent directory has an _index.md
+          const parentIndexPath = path.join(parentDir, '_index.md');
+          if (fs.existsSync(parentIndexPath) && filePath !== parentIndexPath) {
+            // Look up the parent page ID from our processed pages
+            const parentRelativePath = path.relative(dirPath, parentIndexPath);
+            if (processedPages.has(parentRelativePath)) {
+              actualParentId = processedPages.get(parentRelativePath);
+            }
+          }
+          
+          // Push the file
+          const pageId = await pushSingleFile(
+            filePath,
+            options.spaceKey!,
+            actualParentId,
+            options,
+            manifest,
+            manifestManager,
+          );
+          
+          // Store the page ID for child pages to reference
+          const fileRelativePath = path.relative(dirPath, filePath);
+          processedPages.set(fileRelativePath, pageId);
+          
+        } catch (error: any) {
+          logger.error(`Failed to push ${filePath}: ${error.message}`);
+          failedPages.push({ path: filePath, error });
+        }
+      })
+    );
+    
+    // Wait for all files at this depth to complete before moving to next depth
+    await Promise.all(promises);
+  }
+  
+  progress.stop();
+  
+  // Report results
+  const successCount = files.length - failedPages.length;
+  console.log(chalk.green('✓'), `Successfully pushed ${successCount}/${files.length} pages`);
+  
+  if (failedPages.length > 0) {
+    console.log(chalk.yellow('⚠'), `Failed to push ${failedPages.length} pages:`);
+    for (const { path: failedPath, error } of failedPages) {
+      console.log(chalk.red('  ✗'), path.relative(dirPath, failedPath), '-', error.message);
+    }
+  }
+}
+
+// Helper function to build page hierarchy from directory structure
+function buildPageHierarchy(
+  baseDir: string,
+  files: string[],
+  structure: Map<string, { parentPath?: string; isIndex: boolean }>,
+): Map<string, { children: string[]; parent?: string }> {
+  const hierarchy = new Map<string, { children: string[]; parent?: string }>();
+  
+  for (const [filePath, info] of structure.entries()) {
+    const relativePath = path.relative(baseDir, filePath);
+    
+    if (!hierarchy.has(relativePath)) {
+      hierarchy.set(relativePath, { children: [] });
+    }
+    
+    const node = hierarchy.get(relativePath)!;
+    
+    if (info.parentPath) {
+      // This file has a parent
+      const parentIndexPath = path.join(info.parentPath, '_index.md');
+      if (hierarchy.has(parentIndexPath)) {
+        hierarchy.get(parentIndexPath)!.children.push(relativePath);
+        node.parent = parentIndexPath;
+      }
+    }
+  }
+  
+  return hierarchy;
+}
+
+// Helper function to sort files so parents are processed before children
+function sortFilesByHierarchy(baseDir: string, files: string[]): string[] {
+  return files.sort((a, b) => {
+    const aRelative = path.relative(baseDir, a);
+    const bRelative = path.relative(baseDir, b);
+    
+    // Count directory depth
+    const aDepth = aRelative.split(path.sep).length;
+    const bDepth = bRelative.split(path.sep).length;
+    
+    // Process shallower files first
+    if (aDepth !== bDepth) {
+      return aDepth - bDepth;
+    }
+    
+    // Within same depth, process _index.md files first
+    const aIsIndex = path.basename(a) === '_index.md';
+    const bIsIndex = path.basename(b) === '_index.md';
+    
+    if (aIsIndex && !bIsIndex) return -1;
+    if (!aIsIndex && bIsIndex) return 1;
+    
+    // Otherwise, alphabetical order
+    return aRelative.localeCompare(bRelative);
+  });
+}
+
+// Helper function to push a single file (extracted from main logic)
+async function pushSingleFile(
+  filePath: string,
+  spaceKey: string,
+  parentId: string | undefined,
+  options: PushOptions,
+  manifest: any,
+  manifestManager: ManifestManager,
+): Promise<string> {
+  const fileManager = FileManager.getInstance();
+  const relativePath = path.relative(process.cwd(), filePath);
+  
+  // Check if page exists in manifest
+  interface ManifestPage {
+    id: string;
+    spaceKey: string;
+    title: string;
+    version: number;
+    parentId: string | null;
+    lastModified: Date;
+    localPath: string;
+    contentHash: string;
+    status: 'synced' | 'modified' | 'conflicted';
+  }
+  
+  const page = Array.from(manifest.pages.values()).find(
+    (p: any) => p.localPath === relativePath,
+  ) as ManifestPage | undefined;
+  
+  // Read file content
+  const content = await fileManager.readFile(filePath);
+  const contentHash = createHash('sha256').update(content).digest('hex');
+  
+  // Convert to Confluence format
+  const converter = new MarkdownToConfluenceConverter();
+  const confluenceContent = await converter.convert(content);
+  
+  // Extract title from first H1 or use filename
+  const titleMatch = content.match(/^#\s+(.+)$/m);
+  const title: string = titleMatch?.[1] || path.basename(filePath, '.md');
+  
+  if (page) {
+    // Update existing page
+    if (contentHash === page.contentHash && !options.dryRun) {
+      logger.debug(`No changes for ${relativePath}`);
+      return page.id;
+    }
+    
+    if (!options.dryRun) {
+      const remotePage = await apiClient.getPage(page.id, true);
+      const updatedPage = await apiClient.updatePage(
+        page.id,
+        confluenceContent,
+        (remotePage.version?.number || 0) + 1,
+        title,
+      );
+      
+      await manifestManager.updatePage({
+        id: page.id,
+        spaceKey: page.spaceKey,
+        title,
+        version: updatedPage.version?.number || page.version + 1,
+        parentId: page.parentId,
+        lastModified: new Date(),
+        localPath: page.localPath,
+        contentHash,
+        status: 'synced',
+      });
+      
+      logger.info(`Updated page: ${title}`);
+      return page.id;
+    }
+    return page.id;
+  } else {
+    // Create new page
+    if (!options.dryRun) {
+      const space = await apiClient.getSpace(spaceKey);
+      if (!space) {
+        throw new Error(`CS-404: Space not found: ${spaceKey}`);
+      }
+      
+      const newPage = await apiClient.createPage(
+        space.id!,
+        title,
+        confluenceContent,
+        parentId,
+      );
+      
+      // Add to manifest
+      await manifestManager.updatePage({
+        id: newPage.id!,
+        spaceKey,
+        title,
+        version: newPage.version?.number || 1,
+        parentId: parentId || null,
+        lastModified: new Date(),
+        localPath: relativePath,
+        contentHash,
+        status: 'synced',
+      });
+      
+      logger.info(`Created new page: ${title}`);
+      return newPage.id!;
+    }
+  }
+  
+  return 'dry-run-id';
+}
