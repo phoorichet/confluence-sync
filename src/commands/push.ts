@@ -1,4 +1,3 @@
-import type { PageResponse } from '../api/client';
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -7,7 +6,7 @@ import chalk from 'chalk';
 import { Command } from 'commander';
 import * as diff from 'diff';
 import ora from 'ora';
-import { apiClient } from '../api/client';
+import { apiClient, type PageSingle } from '../api/client';
 import { ConfluenceToMarkdownConverter } from '../converters/confluence-to-markdown';
 import { MarkdownToConfluenceConverter } from '../converters/markdown-to-confluence';
 import { BackupManager } from '../storage/backup-manager';
@@ -86,7 +85,7 @@ export const pushCommand = new Command('push')
 
       // Fetch current remote version for conflict detection
       spinner.start('Checking for remote changes...');
-      let remotePage: PageResponse;
+      let remotePage: PageSingle;
       try {
         remotePage = await apiClient.getPage(page.id, true);
       }
@@ -96,7 +95,7 @@ export const pushCommand = new Command('push')
       }
 
       // Check for conflicts
-      if (remotePage.version && remotePage.version.number > page.version) {
+      if (remotePage.version && typeof remotePage.version.number === 'number' && remotePage.version.number > page.version) {
         spinner.fail();
 
         // Handle conflict with force flags

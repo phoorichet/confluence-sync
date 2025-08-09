@@ -1,33 +1,16 @@
-import type { paths } from './types';
+import type { components, paths } from './types';
 import createClient from 'openapi-fetch';
 import { AuthManager } from '../auth/auth-manager';
 import { CircuitBreaker, ErrorMapper, isTransientError, RetryHandler } from './circuit-breaker';
 import { RateLimiter } from './rate-limiter';
 
 // Define response types for better type safety
-export interface PageResponse {
-  id: string;
-  title: string;
-  status: string;
-  version?: {
-    number: number;
-    message?: string;
-  };
-  body?: {
-    storage?: {
-      value: string;
-      representation: string;
-    };
-  };
-  [key: string]: any;
-}
-
-export interface SpaceResponse {
-  id: string;
-  key: string;
-  name: string;
-  [key: string]: any;
-}
+export type PageBulk = components['schemas']['PageBulk'];
+export type PageSingle = components['schemas']['PageSingle'];
+export type ChildPage = components['schemas']['ChildPage'];
+export type SpaceBulk = components['schemas']['SpaceBulk'];
+export type ChildrenResponse = components['schemas']['ChildrenResponse'];
+export type FolderSingle = components['schemas']['FolderSingle'];
 
 export class ConfluenceAPIClient {
   private static instance: ConfluenceAPIClient;
@@ -147,7 +130,7 @@ export class ConfluenceAPIClient {
     return url;
   }
 
-  public async getPage(pageId: string, includeBody = false): Promise<PageResponse> {
+  public async getPage(pageId: string, includeBody = false): Promise<PageSingle > {
     return this.executeWithProtection(async () => {
       // Convert string ID to number as required by the API
       const numericId = Number.parseInt(pageId, 10);
@@ -158,7 +141,12 @@ export class ConfluenceAPIClient {
       const response = await this.client.GET('/pages/{id}', {
         params: {
           path: { id: numericId },
-          query: includeBody ? { 'body-format': 'storage' as const } : {},
+          query: includeBody
+            ? {
+                'body-format': 'storage',
+                'include-direct-children': true,
+              }
+            : {},
         },
       });
 
@@ -166,11 +154,15 @@ export class ConfluenceAPIClient {
         throw new Error(`CS-404: Failed to get page ${pageId}: ${response.error || 'No data returned'}`);
       }
 
-      return response.data as PageResponse;
+      return {
+        ...response.data,
+        // @ts-expect-error Direct children may not be present in all responses
+        directChildren: response.data.directChildren || { results: [] }, // Ensure directChildren is always present
+      };
     }, { timeout: 30000 }); // 30s timeout for single page
   }
 
-  public async updatePage(pageId: string, body: string, version: number, title: string): Promise<PageResponse> {
+  public async updatePage(pageId: string, body: string, version: number, title: string): Promise<PageSingle> {
     return this.executeWithProtection(async () => {
       // Convert string ID to number as required by the API
       const numericId = Number.parseInt(pageId, 10);
@@ -201,11 +193,11 @@ export class ConfluenceAPIClient {
         throw new Error(`CS-500: Failed to update page ${pageId}: ${response.error || 'No data returned'}`);
       }
 
-      return response.data as PageResponse;
+      return response.data;
     }, { timeout: 30000 }); // 30s timeout for single page
   }
 
-  public async getSpace(spaceKey: string): Promise<SpaceResponse | null> {
+  public async getSpace(spaceKey: string) {
     return this.executeWithProtection(async () => {
       const response = await this.client.GET('/spaces', {
         params: {
@@ -220,11 +212,11 @@ export class ConfluenceAPIClient {
       }
 
       const spaces = response.data?.results || [];
-      return spaces.length > 0 ? spaces[0] as SpaceResponse : null;
+      return spaces[0];
     }, { timeout: 30000 });
   }
 
-  public async searchPages(spaceKey: string, query?: string): Promise<PageResponse[]> {
+  public async searchPages(spaceKey: string, query?: string): Promise<PageSingle[]> {
     return this.executeWithProtection(async () => {
       // Build query parameters based on V2 API structure
       const queryParams: any = {
@@ -247,11 +239,11 @@ export class ConfluenceAPIClient {
         throw new Error(`CS-500: Failed to search pages: ${response.error}`);
       }
 
-      return (response.data?.results || []) as PageResponse[];
+      return (response.data?.results || []) as PageSingle[];
     }, { timeout: 300000 }); // 5min timeout for bulk operations
   }
 
-  public async createPage(spaceId: string, title: string, body: string, parentId?: string): Promise<PageResponse> {
+  public async createPage(spaceId: string, title: string, body: string, parentId?: string): Promise<PageSingle> {
     return this.executeWithProtection(async () => {
       const requestBody: any = {
         spaceId,
@@ -275,7 +267,7 @@ export class ConfluenceAPIClient {
         throw new Error(`CS-500: Failed to create page: ${response.error || 'No data returned'}`);
       }
 
-      return response.data as PageResponse;
+      return response.data as PageSingle;
     }, { timeout: 30000 });
   }
 
@@ -299,7 +291,7 @@ export class ConfluenceAPIClient {
     }, { timeout: 30000 });
   }
 
-  public async getPageChildren(pageId: string): Promise<PageResponse[]> {
+  public async getPageChildren(pageId: string): Promise<ChildPage[]> {
     return this.executeWithProtection(async () => {
       // Convert string ID to number as required by the API
       const numericId = Number.parseInt(pageId, 10);
@@ -320,13 +312,90 @@ export class ConfluenceAPIClient {
         throw new Error(`CS-500: Failed to get page children: ${response.error}`);
       }
 
-      return (response.data?.results || []) as PageResponse[];
+      return (response.data?.results || []);
     }, { timeout: 300000 }); // 5min timeout for bulk operations
   }
 
   public async getPageContent(pageId: string): Promise<string> {
     const page = await this.getPage(pageId, true);
     return page.body?.storage?.value || '';
+  }
+
+  public async getSpaceDetails(spaceKey: string): Promise<SpaceBulk | null> {
+    return this.executeWithProtection(async () => {
+      const response = await this.client.GET('/spaces', {
+        params: {
+          query: {
+            keys: [spaceKey],
+          },
+        },
+      });
+
+      if (response.error) {
+        throw new Error(`CS-805: Failed to get space ${spaceKey}: ${response.error}`);
+      }
+
+      const spaces = response.data?.results || [];
+      if (spaces.length === 0) {
+        return null;
+      }
+
+      // Return enriched space data
+      const space = spaces[0];
+      if (!space) {
+        throw new Error(`CS-404: Space ${spaceKey} not found`);
+      }
+
+      return space;
+    }, { timeout: 30000 });
+  }
+
+  public async getSpacePages(spaceId: number, options: { limit?: number } = {}) {
+    return this.executeWithProtection(async () => {
+      const { limit = 250 } = options;
+
+      const response = await this.client.GET('/pages', {
+        params: {
+          query: {
+            'space-id': [spaceId],
+            limit,
+            'sort': 'id',
+            'body-format': 'storage',
+          },
+        },
+      });
+
+      if (response.error) {
+        throw new Error(`CS-806: Failed to get pages from space ${spaceId}: ${response.error}`);
+      }
+      if (!response.data) {
+        throw new Error(`CS-404: No pages found in space ${spaceId}`);
+      }
+
+      return response.data;
+    }, { timeout: 300000 }); // 5min timeout for bulk operations
+  }
+
+  public async getFolder(folderId: string): Promise<FolderSingle> {
+    return this.executeWithProtection(async () => {
+      // Convert string ID to number as required by the API
+      const numericId = Number.parseInt(folderId, 10);
+      if (Number.isNaN(numericId)) {
+        throw new TypeError(`CS-400: Invalid folder ID: ${folderId}`);
+      }
+
+      const response = await this.client.GET('/folders/{id}', {
+        params: {
+          path: { id: numericId },
+        },
+      });
+
+      if (response.error || !response.data) {
+        throw new Error(`CS-404: Failed to get folder ${folderId}: ${response.error || 'No data returned'}`);
+      }
+
+      return response.data;
+    }, { timeout: 30000 }); // 30s timeout for single folder
   }
 
   private async executeWithProtection<T>(

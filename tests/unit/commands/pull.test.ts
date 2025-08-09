@@ -1,70 +1,22 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { apiClient } from '../../../src/api/client';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { pullCommand } from '../../../src/commands/pull';
-import { ConfluenceToMarkdownConverter } from '../../../src/converters/confluence-to-markdown';
-import { FileManager } from '../../../src/storage/file-manager';
-import { ManifestManager } from '../../../src/storage/manifest-manager';
-
-// Mock all dependencies
-vi.mock('../../../src/api/client', () => ({
-  apiClient: {
-    initialize: vi.fn(),
-    getPage: vi.fn(),
-  },
-}));
-vi.mock('../../../src/converters/confluence-to-markdown');
-vi.mock('../../../src/storage/file-manager');
-vi.mock('../../../src/storage/manifest-manager');
-vi.mock('../../../src/utils/logger');
-vi.mock('../../../src/utils/progress', () => ({
-  createProgress: () => ({
-    start: vi.fn(),
-    update: vi.fn(),
-    stop: vi.fn(),
-  }),
-}));
 
 describe('pull Command', () => {
-  let mockApiClient: any;
-  let mockConverter: any;
-  let mockFileManager: any;
-  let mockManifestManager: any;
   let consoleLogSpy: any;
   let consoleErrorSpy: any;
 
   beforeEach(() => {
-    // Setup mocks
-    mockApiClient = apiClient;
-    vi.clearAllMocks();
-
-    mockConverter = {
-      convert: vi.fn(),
-    };
-    vi.mocked(ConfluenceToMarkdownConverter).mockImplementation(() => mockConverter);
-
-    mockFileManager = {
-      sanitizeFilename: vi.fn(),
-      writeFile: vi.fn(),
-      calculateHash: vi.fn(),
-    };
-    vi.mocked(FileManager).mockImplementation(() => mockFileManager);
-
-    mockManifestManager = {
-      updatePage: vi.fn(),
-    };
-    vi.mocked(ManifestManager.getInstance).mockReturnValue(mockManifestManager);
-
     // Spy on console methods
-    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.spyOn(process, 'exit').mockImplementation(() => {
+    consoleLogSpy = spyOn(console, 'log').mockImplementation(() => {});
+    consoleErrorSpy = spyOn(console, 'error').mockImplementation(() => {});
+    spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
-    vi.restoreAllMocks();
+    consoleLogSpy.mockRestore();
+    consoleErrorSpy.mockRestore();
   });
 
   it('should pull a page successfully', async () => {
@@ -241,6 +193,208 @@ describe('pull Command', () => {
       expect.any(String),
       'empty-page',
       '',
+    );
+  });
+
+  describe('space pull', () => {
+    it('should pull all pages from a space', async () => {
+      // Arrange
+      const spaceKey = 'TEST';
+      const mockSpace = {
+        key: spaceKey,
+        name: 'Test Space',
+        type: 'global',
+        id: 'space123',
+      };
+
+      const mockPages = [
+        {
+          id: '1',
+          title: 'Page 1',
+          body: { storage: { value: '<p>Content 1</p>' } },
+          version: { number: 1 },
+        },
+        {
+          id: '2',
+          title: 'Page 2',
+          body: { storage: { value: '<p>Content 2</p>' } },
+          version: { number: 2 },
+        },
+      ];
+
+      mockApiClient.getSpaceDetails.mockResolvedValue(mockSpace);
+      mockApiClient.getSpacePages.mockResolvedValue({
+        results: mockPages,
+        size: 2,
+      });
+      mockConverter.convert.mockImplementation(html => `Converted: ${html}`);
+      mockFileManager.sanitizeFilename.mockImplementation(title => title.toLowerCase().replace(' ', '-'));
+      mockFileManager.writeFile.mockImplementation(path => Promise.resolve(path));
+      mockFileManager.calculateHash.mockReturnValue('hash123');
+
+      // Act
+      await pullCommand.parseAsync(['node', 'test', '--space', spaceKey], { from: 'user' });
+
+      // Assert
+      expect(mockApiClient.getSpaceDetails).toHaveBeenCalledWith(spaceKey);
+      expect(mockApiClient.getSpacePages).toHaveBeenCalledWith(spaceKey, { start: 0, limit: 250 });
+      expect(mockManifestManager.updateSpace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          key: spaceKey,
+          name: 'Test Space',
+        }),
+      );
+      expect(mockManifestManager.updatePage).toHaveBeenCalledTimes(2);
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.stringContaining(`Successfully pulled 2 pages from space ${spaceKey}`),
+      );
+    });
+
+    it('should handle space not found', async () => {
+      // Arrange
+      const spaceKey = 'NOTFOUND';
+      mockApiClient.getSpaceDetails.mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(
+        pullCommand.parseAsync(['node', 'test', '--space', spaceKey], { from: 'user' }),
+      ).rejects.toThrow('process.exit called');
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.stringContaining(`CS-803: Space with key ${spaceKey} not found`),
+      );
+    });
+
+    it('should handle empty space', async () => {
+      // Arrange
+      const spaceKey = 'EMPTY';
+      const mockSpace = {
+        key: spaceKey,
+        name: 'Empty Space',
+        type: 'global',
+      };
+
+      mockApiClient.getSpaceDetails.mockResolvedValue(mockSpace);
+      mockApiClient.getSpacePages.mockResolvedValue({
+        results: [],
+        size: 0,
+      });
+
+      // Act
+      await pullCommand.parseAsync(['node', 'test', '--space', spaceKey], { from: 'user' });
+
+      // Assert
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.stringContaining(`No pages found in space ${spaceKey}`),
+      );
+    });
+  });
+
+  describe('recursive pull', () => {
+    it('should pull a page and its children recursively', async () => {
+      // Arrange
+      const pageId = '100';
+      const mockParentPage = {
+        id: pageId,
+        title: 'Parent Page',
+        body: { storage: { value: '<p>Parent content</p>' } },
+        version: { number: 1 },
+      };
+
+      const mockChildren = [
+        {
+          id: '101',
+          title: 'Child 1',
+          body: { storage: { value: '<p>Child 1 content</p>' } },
+          version: { number: 1 },
+        },
+        {
+          id: '102',
+          title: 'Child 2',
+          body: { storage: { value: '<p>Child 2 content</p>' } },
+          version: { number: 1 },
+        },
+      ];
+
+      mockApiClient.getPage.mockResolvedValue(mockParentPage);
+      mockApiClient.getPageChildren.mockImplementation((id) => {
+        if (id === pageId)
+          return Promise.resolve(mockChildren);
+        return Promise.resolve([]);
+      });
+
+      mockConverter.convert.mockImplementation(html => `Converted: ${html}`);
+      mockFileManager.sanitizeFilename.mockImplementation(title => title.toLowerCase().replace(' ', '-'));
+      mockFileManager.writeFile.mockImplementation(path => Promise.resolve(path));
+      mockFileManager.calculateHash.mockReturnValue('hash123');
+
+      // Act
+      await pullCommand.parseAsync(['node', 'test', pageId, '--recursive'], { from: 'user' });
+
+      // Assert
+      expect(mockApiClient.getPage).toHaveBeenCalledWith(pageId, true);
+      expect(mockApiClient.getPageChildren).toHaveBeenCalledWith(pageId);
+      expect(mockManifestManager.updatePage).toHaveBeenCalledTimes(3); // Parent + 2 children
+    });
+
+    it('should respect max depth limit', async () => {
+      // Arrange
+      const pageId = '200';
+      const mockPage = {
+        id: pageId,
+        title: 'Root Page',
+        body: { storage: { value: '<p>Root content</p>' } },
+        version: { number: 1 },
+      };
+
+      const mockChildren = [
+        { id: '201', title: 'Child 1' },
+      ];
+
+      mockApiClient.getPage.mockResolvedValue(mockPage);
+      mockApiClient.getPageChildren.mockResolvedValue(mockChildren);
+
+      mockConverter.convert.mockReturnValue('Converted content');
+      mockFileManager.sanitizeFilename.mockReturnValue('filename');
+      mockFileManager.writeFile.mockResolvedValue('/path/to/file');
+      mockFileManager.calculateHash.mockReturnValue('hash');
+
+      // Act - with max depth of 1
+      await pullCommand.parseAsync(
+        ['node', 'test', pageId, '--recursive', '--max-depth', '1'],
+        { from: 'user' },
+      );
+
+      // Assert - should only call getPage once for root (depth 0)
+      expect(mockApiClient.getPage).toHaveBeenCalledTimes(1);
+      expect(mockApiClient.getPageChildren).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('should reject when both pageId and space are provided', async () => {
+    // Act & Assert
+    await expect(
+      pullCommand.parseAsync(['node', 'test', '123', '--space', 'TEST'], { from: 'user' }),
+    ).rejects.toThrow('process.exit called');
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('CS-801: Cannot specify both page ID and --space option'),
+    );
+  });
+
+  it('should reject when neither pageId nor space are provided', async () => {
+    // Act & Assert
+    await expect(
+      pullCommand.parseAsync(['node', 'test'], { from: 'user' }),
+    ).rejects.toThrow('process.exit called');
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('CS-800: Either a page ID or --space option is required'),
     );
   });
 });

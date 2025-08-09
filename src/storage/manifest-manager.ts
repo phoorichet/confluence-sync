@@ -33,13 +33,51 @@ const ResolutionRecordSchema = z.object({
   previousRemoteHash: z.string().optional(),
 });
 
-// Define the Page schema
+// Define the Space schema
+const SpaceSchema = z.object({
+  id: z.string(),
+  key: z.string(),
+  name: z.string(),
+  type: z.enum(['global', 'personal', 'collaboration', 'knowledge_base']).default('global'),
+  permissions: z.object({
+    view: z.boolean(),
+    edit: z.boolean(),
+    delete: z.boolean(),
+  }),
+  homepageId: z.string().optional(),
+  lastSyncTime: z.date().optional(),
+});
+
+// Define the Folder schema with same fields as FolderSingle from API
+const FolderSchema = z.object({
+  id: z.string(),
+  type: z.string().optional(),
+  status: z.enum(['current', 'draft', 'archived', 'historical', 'trashed', 'deleted', 'any']).optional(),
+  title: z.string().optional(),
+  parentId: z.string().nullable().optional(),
+  parentType: z.enum(['page', 'whiteboard', 'database', 'embed', 'folder']).optional(),
+  position: z.number().nullable().optional(),
+  authorId: z.string().optional(),
+  ownerId: z.string().optional(),
+  createdAt: z.string().optional(),
+  version: z.object({
+    createdAt: z.string().optional(),
+    message: z.string().optional(),
+    number: z.number().optional(),
+    minorEdit: z.boolean().optional(),
+    authorId: z.string().optional(),
+  }).optional(),
+});
+
+// Define the Page schema with hierarchy support
 const PageSchema = z.object({
   id: z.string(),
   spaceKey: z.string(),
   title: z.string(),
   version: z.number(),
   parentId: z.string().nullable(),
+  parentType: z.enum(['page', 'whiteboard', 'database', 'embed', 'folder']).optional(),
+  position: z.number().optional(), // Order among siblings
   lastModified: z.date(),
   localPath: z.string(),
   contentHash: z.string(),
@@ -56,6 +94,8 @@ const SyncManifestSchema = z.object({
   lastSyncTime: z.date(),
   syncMode: z.enum(['manual', 'watch']).default('manual'),
   pages: z.map(z.string(), PageSchema),
+  spaces: z.map(z.string(), SpaceSchema).optional(), // Space metadata storage
+  folders: z.map(z.string(), FolderSchema).optional(), // Folder metadata storage
   config: SyncConfigSchema.optional(),
   operations: z.array(SyncOperationSchema).optional(),
 });
@@ -69,6 +109,8 @@ const _SyncManifestV1Schema = z.object({
 });
 
 export type ResolutionRecord = z.infer<typeof ResolutionRecordSchema>;
+export type Space = z.infer<typeof SpaceSchema>;
+export type Folder = z.infer<typeof FolderSchema>;
 export type Page = z.infer<typeof PageSchema>;
 export type SyncConfig = z.infer<typeof SyncConfigSchema>;
 export type SyncOperation = z.infer<typeof SyncOperationSchema>;
@@ -146,6 +188,50 @@ export class ManifestManager {
             startTime: new Date(op.startTime),
             endTime: op.endTime ? new Date(op.endTime) : null,
           }));
+        }
+
+        // Parse spaces if present
+        if (rawData.spaces) {
+          const spacesMap = new Map<string, Space>();
+
+          if (Array.isArray(rawData.spaces)) {
+            // If it's stored as array of [key, value] pairs (Map serialization)
+            for (const [key, space] of rawData.spaces) {
+              if (space.lastSyncTime) {
+                space.lastSyncTime = new Date(space.lastSyncTime);
+              }
+              spacesMap.set(key, space);
+            }
+          }
+          else if (typeof rawData.spaces === 'object') {
+            // If it's stored as object
+            for (const [key, space] of Object.entries(rawData.spaces)) {
+              if ((space as any).lastSyncTime) {
+                (space as any).lastSyncTime = new Date((space as any).lastSyncTime);
+              }
+              spacesMap.set(key, space as Space);
+            }
+          }
+          rawData.spaces = spacesMap;
+        }
+
+        // Parse folders if present
+        if (rawData.folders) {
+          const foldersMap = new Map<string, Folder>();
+
+          if (Array.isArray(rawData.folders)) {
+            // If it's stored as array of [key, value] pairs (Map serialization)
+            for (const [id, folder] of rawData.folders) {
+              foldersMap.set(id, folder);
+            }
+          }
+          else if (typeof rawData.folders === 'object') {
+            // If it's stored as object
+            for (const [id, folder] of Object.entries(rawData.folders)) {
+              foldersMap.set(id, folder as Folder);
+            }
+          }
+          rawData.folders = foldersMap;
         }
 
         // Validate with zod schema
@@ -245,6 +331,8 @@ export class ManifestManager {
       lastSyncTime: v1Data.lastSyncTime || new Date(),
       syncMode: 'manual',
       pages: pagesMap,
+      spaces: new Map(), // Initialize empty spaces map
+      folders: new Map(), // Initialize empty folders map
       config: {
         profile: 'default',
         includePatterns: ['**/*.md'],
@@ -268,10 +356,12 @@ export class ManifestManager {
         throw new Error('CS-500: No manifest to save');
       }
 
-      // Convert Map to array for JSON serialization
+      // Convert Maps to arrays for JSON serialization
       const toSave = {
         ...this.manifest,
         pages: Array.from(this.manifest.pages.entries()),
+        spaces: this.manifest.spaces ? Array.from(this.manifest.spaces.entries()) : undefined,
+        folders: this.manifest.folders ? Array.from(this.manifest.folders.entries()) : undefined,
       };
 
       const content = JSON.stringify(toSave, null, 2);
@@ -301,7 +391,7 @@ export class ManifestManager {
         throw new Error('CS-500: Failed to load manifest');
       }
 
-      this.manifest.pages.set(page.id, page);
+      this.manifest.pages.set(page.id.toString(), page);
       this.manifest.lastSyncTime = new Date();
 
       await this.save();
@@ -409,7 +499,7 @@ export class ManifestManager {
         const children = hierarchy.get(currentId) || [];
         if (children.length > 0) {
           subtree.set(currentId, children);
-          queue.push(...children.map(c => c.id));
+          queue.push(...children.map(c => c.id.toString()));
         }
       }
 
@@ -432,6 +522,8 @@ export class ManifestManager {
       lastSyncTime: new Date(),
       syncMode: 'manual',
       pages: new Map(),
+      spaces: new Map(),
+      folders: new Map(),
       config: {
         profile: 'default',
         includePatterns: ['**/*.md'],
@@ -492,6 +584,134 @@ export class ManifestManager {
       logger.error('Failed to clear pages from manifest', error);
       throw new Error(`CS-503: Failed to update manifest: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  /**
+   * Update or add a space in the manifest
+   */
+  async updateSpace(space: Space): Promise<void> {
+    try {
+      if (!this.manifest) {
+        await this.load();
+      }
+
+      if (!this.manifest) {
+        throw new Error('CS-500: Failed to load manifest');
+      }
+
+      // Initialize spaces map if not present
+      if (!this.manifest.spaces) {
+        this.manifest.spaces = new Map();
+      }
+
+      this.manifest.spaces.set(space.key, space);
+      this.manifest.lastSyncTime = new Date();
+
+      await this.save();
+      logger.info(`Updated space ${space.key} in manifest`);
+    }
+    catch (error) {
+      logger.error('Failed to update space in manifest', error);
+      // Re-throw if already a CS error
+      if (error instanceof Error && error.message.startsWith('CS-')) {
+        throw error;
+      }
+      throw new Error(`CS-503: Failed to update manifest: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get a space from the manifest
+   */
+  async getSpace(spaceKey: string): Promise<Space | undefined> {
+    if (!this.manifest) {
+      await this.load();
+    }
+
+    if (!this.manifest) {
+      throw new Error('CS-500: Failed to load manifest');
+    }
+
+    return this.manifest.spaces?.get(spaceKey);
+  }
+
+  /**
+   * Get all spaces from the manifest
+   */
+  async getAllSpaces(): Promise<Map<string, Space>> {
+    if (!this.manifest) {
+      await this.load();
+    }
+
+    if (!this.manifest) {
+      throw new Error('CS-500: Failed to load manifest');
+    }
+
+    return this.manifest.spaces || new Map();
+  }
+
+  /**
+   * Update or add a folder in the manifest
+   */
+  async updateFolder(folder: Folder): Promise<void> {
+    try {
+      if (!this.manifest) {
+        await this.load();
+      }
+
+      if (!this.manifest) {
+        throw new Error('CS-500: Failed to load manifest');
+      }
+
+      // Initialize folders map if not present
+      if (!this.manifest.folders) {
+        this.manifest.folders = new Map();
+      }
+
+      this.manifest.folders.set(folder.id, folder);
+      this.manifest.lastSyncTime = new Date();
+
+      await this.save();
+      logger.info(`Updated folder ${folder.id} in manifest`);
+    }
+    catch (error) {
+      logger.error('Failed to update folder in manifest', error);
+      // Re-throw if already a CS error
+      if (error instanceof Error && error.message.startsWith('CS-')) {
+        throw error;
+      }
+      throw new Error(`CS-503: Failed to update manifest: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get a folder from the manifest
+   */
+  async getFolder(folderId: string): Promise<Folder | undefined> {
+    if (!this.manifest) {
+      await this.load();
+    }
+
+    if (!this.manifest) {
+      throw new Error('CS-500: Failed to load manifest');
+    }
+
+    return this.manifest.folders?.get(folderId);
+  }
+
+  /**
+   * Get all folders from the manifest
+   */
+  async getAllFolders(): Promise<Map<string, Folder>> {
+    if (!this.manifest) {
+      await this.load();
+    }
+
+    if (!this.manifest) {
+      throw new Error('CS-500: Failed to load manifest');
+    }
+
+    return this.manifest.folders || new Map();
   }
 
   /**

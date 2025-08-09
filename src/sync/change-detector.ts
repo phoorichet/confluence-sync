@@ -228,4 +228,11 @@ export class ChangeDetector {
       return null;
     }
   }
+
+  /**
+   * Clear singleton instance (for testing)
+   */
+  static clearInstance(): void {
+    ChangeDetector.instance = null as any;
+  }
 }

@@ -3,7 +3,7 @@
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const OPENAPI_URL = 'https://dac-static.atlassian.com/cloud/confluence/openapi-v2.v3.json';
+const OPENAPI_URL = 'https://dac-static.atlassian.com/cloud/confluence/openapi-v2.v3.json?_v=1.8025.0-0.1324.0';
 const OUTPUT_PATH = resolve(process.cwd(), 'src/openapi/confluence-openapi.json');
 
 async function downloadOpenAPISpec() {
