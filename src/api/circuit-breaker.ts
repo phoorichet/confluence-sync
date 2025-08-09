@@ -10,9 +10,11 @@ export interface CircuitBreakerOptions {
   failureThreshold?: number;
   resetTimeout?: number;
   successThreshold?: number;
+  monitoringPeriod?: number;
 }
 
 export class CircuitBreaker {
+  private static instance: CircuitBreaker | null = null;
   private state: CircuitState = CircuitState.CLOSED;
   private failureCount = 0;
   private successCount = 0;
@@ -20,11 +22,21 @@ export class CircuitBreaker {
   private readonly failureThreshold: number;
   private readonly resetTimeout: number;
   private readonly successThreshold: number;
+  private readonly monitoringPeriod: number;
+  private resetTimer: Timer | null = null;
 
-  constructor(options: CircuitBreakerOptions = {}) {
+  private constructor(options: CircuitBreakerOptions = {}) {
     this.failureThreshold = options.failureThreshold || 5;
     this.resetTimeout = options.resetTimeout || 30000; // 30 seconds
     this.successThreshold = options.successThreshold || 2;
+    this.monitoringPeriod = options.monitoringPeriod || 60000; // 1 minute
+  }
+
+  static getInstance(options?: CircuitBreakerOptions): CircuitBreaker {
+    if (!CircuitBreaker.instance) {
+      CircuitBreaker.instance = new CircuitBreaker(options);
+    }
+    return CircuitBreaker.instance;
   }
 
   public async execute<T>(fn: () => Promise<T>): Promise<T> {
@@ -41,7 +53,7 @@ export class CircuitBreaker {
       }
       else {
         const waitTime = Math.ceil((this.resetTimeout - timeSinceLastFailure) / 1000);
-        throw new Error(`CS-503: Circuit breaker is open. Service unavailable. Retry in ${waitTime} seconds.`);
+        throw new Error(`CS-901: Circuit breaker is open. Service unavailable. Retry in ${waitTime} seconds.`);
       }
     }
 
@@ -193,18 +205,20 @@ export function isTransientError(error: any): boolean {
     return false;
 
   // Network errors
-  if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND') {
+  const networkErrorCodes = ['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH'];
+  if (error.code && networkErrorCodes.includes(error.code)) {
     return true;
   }
 
   // HTTP status codes that are retryable
   const status = error.status || error.statusCode;
   if (status) {
+    // 408 Request Timeout
     // 429 Too Many Requests
     // 502 Bad Gateway
     // 503 Service Unavailable
     // 504 Gateway Timeout
-    return status === 429 || status === 502 || status === 503 || status === 504;
+    return status === 408 || status === 429 || status === 502 || status === 503 || status === 504;
   }
 
   // Check error message for transient patterns
@@ -216,6 +230,8 @@ export function isTransientError(error: any): boolean {
     'ECONNRESET',
     'Service Unavailable',
     'Gateway Timeout',
+    'EHOSTUNREACH',
+    'ENETUNREACH',
   ];
 
   return transientPatterns.some(pattern =>

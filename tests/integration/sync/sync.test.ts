@@ -9,7 +9,7 @@ import { logger } from '../../../src/utils/logger';
 
 describe('Sync Integration Tests', () => {
   const testDir = path.join(__dirname, 'test-workspace');
-  const manifestPath = path.join(testDir, '.confluence-sync.json');
+  const _manifestPath = path.join(testDir, '.confluence-sync.json');
   let syncEngine: SyncEngine;
   let manifestManager: ManifestManager;
 

@@ -129,7 +129,7 @@ export class SyncEngine {
       }
 
       // Handle conflicts first
-      for (const [pageId, page] of changes.conflicts) {
+      for (const [_pageId, page] of changes.conflicts) {
         result.conflicted.push(page.localPath);
         if (!options.dryRun) {
           logger.warn(`Conflict detected for ${page.localPath}`);

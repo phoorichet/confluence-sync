@@ -6,10 +6,14 @@ describe('rateLimiter', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    rateLimiter = new RateLimiter({
+    // Reset singleton instance for testing
+    (RateLimiter as any).instance = null;
+    rateLimiter = RateLimiter.getInstance({
       requestsPerHour: 100,
       concurrency: 2,
       warnThreshold: 0.8,
+      readConcurrency: 3,
+      writeConcurrency: 1,
     });
   });
 
@@ -17,9 +21,16 @@ describe('rateLimiter', () => {
     vi.restoreAllMocks();
   });
 
-  describe('constructor', () => {
+  describe('getInstance', () => {
+    it('should return singleton instance', () => {
+      const instance1 = RateLimiter.getInstance();
+      const instance2 = RateLimiter.getInstance();
+      expect(instance1).toBe(instance2);
+    });
+
     it('should initialize with default values', () => {
-      const limiter = new RateLimiter();
+      (RateLimiter as any).instance = null;
+      const limiter = RateLimiter.getInstance();
       const stats = limiter.getStats();
 
       expect(stats.requestsPerHour).toBe(5000);
@@ -63,6 +74,43 @@ describe('rateLimiter', () => {
 
       expect(results).toEqual(['result', 'result', 'result']);
       expect(mockFn).toHaveBeenCalledTimes(3);
+    });
+
+    it('should execute read operations with read limiter', async () => {
+      const mockFn = vi.fn().mockResolvedValue('read-result');
+
+      const result = await rateLimiter.executeRead(mockFn);
+
+      expect(result).toBe('read-result');
+      expect(mockFn).toHaveBeenCalled();
+    });
+
+    it('should execute write operations with write limiter', async () => {
+      const mockFn = vi.fn().mockResolvedValue('write-result');
+
+      const result = await rateLimiter.executeWrite(mockFn);
+
+      expect(result).toBe('write-result');
+      expect(mockFn).toHaveBeenCalled();
+    });
+
+    it('should track queued requests', async () => {
+      const mockFn = vi.fn().mockImplementation(
+        () => new Promise(resolve => setTimeout(() => resolve('result'), 50)),
+      );
+
+      // Start multiple concurrent requests
+      const promises = [
+        rateLimiter.execute(mockFn),
+        rateLimiter.execute(mockFn),
+        rateLimiter.execute(mockFn),
+      ];
+
+      // Check that queued requests are tracked
+      const stats = rateLimiter.getStats();
+      expect(stats.queuedRequests).toBeGreaterThan(0);
+
+      await Promise.all(promises);
     });
 
     it('should handle 429 rate limit errors', async () => {
@@ -204,7 +252,7 @@ describe('tokenBucket', () => {
       expect(bucket.getAvailableTokens()).toBe(0);
 
       // Simulate time passing by manually refilling
-      bucket.lastRefill = Date.now() - 1000; // 1 second ago
+      (bucket as any).lastRefill = Date.now() - 1000; // 1 second ago
 
       // Tokens should be refilled (1 token per second with 3600/hour rate)
       const available = bucket.getAvailableTokens();

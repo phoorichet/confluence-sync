@@ -12,7 +12,9 @@ describe('circuitBreaker', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    circuitBreaker = new CircuitBreaker({
+    // Reset singleton instance for testing
+    (CircuitBreaker as any).instance = null;
+    circuitBreaker = CircuitBreaker.getInstance({
       failureThreshold: 3,
       resetTimeout: 100, // Short timeout for testing
       successThreshold: 2,
@@ -21,6 +23,14 @@ describe('circuitBreaker', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  describe('getInstance', () => {
+    it('should return singleton instance', () => {
+      const instance1 = CircuitBreaker.getInstance();
+      const instance2 = CircuitBreaker.getInstance();
+      expect(instance1).toBe(instance2);
+    });
   });
 
   describe('execute', () => {
@@ -50,7 +60,7 @@ describe('circuitBreaker', () => {
       expect(circuitBreaker.getState()).toBe(CircuitState.OPEN);
 
       // Should reject immediately when open
-      await expect(circuitBreaker.execute(mockFn)).rejects.toThrow('CS-503: Circuit breaker is open');
+      await expect(circuitBreaker.execute(mockFn)).rejects.toThrow('CS-901: Circuit breaker is open');
       expect(mockFn).toHaveBeenCalledTimes(3); // Not called on 4th attempt
     });
 
@@ -86,7 +96,7 @@ describe('circuitBreaker', () => {
       const mockFn = vi.fn().mockResolvedValue('success');
 
       // Manually set to half-open state
-      circuitBreaker.state = CircuitState.HALF_OPEN;
+      (circuitBreaker as any).state = CircuitState.HALF_OPEN;
 
       // Succeed twice (threshold)
       await circuitBreaker.execute(mockFn);
@@ -99,7 +109,7 @@ describe('circuitBreaker', () => {
       const mockFn = vi.fn().mockRejectedValue(new Error('failure'));
 
       // Manually set to half-open state
-      circuitBreaker.state = CircuitState.HALF_OPEN;
+      (circuitBreaker as any).state = CircuitState.HALF_OPEN;
 
       try {
         await circuitBreaker.execute(mockFn);

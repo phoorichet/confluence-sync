@@ -1,13 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { apiClient } from '../../../src/api/client';
-import { pushCommand } from '../../../src/commands/push';
 import { ManifestManager } from '../../../src/storage/manifest-manager';
 
 describe('Hierarchy Push Integration', () => {
   const testDir = path.join(import.meta.dir, 'test-push-dir');
-  const manifestPath = path.join(testDir, '.confluence-sync.json');
+  const _manifestPath = path.join(testDir, '.confluence-sync.json');
 
   beforeEach(() => {
     // Create test directory structure
@@ -114,27 +113,29 @@ describe('Hierarchy Push Integration', () => {
     const sorted = files.sort((a, b) => {
       const aRelative = path.relative(testDir, a);
       const bRelative = path.relative(testDir, b);
-      
+
       const aDepth = aRelative.split(path.sep).length;
       const bDepth = bRelative.split(path.sep).length;
-      
+
       if (aDepth !== bDepth) {
         return aDepth - bDepth;
       }
-      
+
       const aIsIndex = path.basename(a) === '_index.md';
       const bIsIndex = path.basename(b) === '_index.md';
-      
-      if (aIsIndex && !bIsIndex) return -1;
-      if (!aIsIndex && bIsIndex) return 1;
-      
+
+      if (aIsIndex && !bIsIndex)
+        return -1;
+      if (!aIsIndex && bIsIndex)
+        return 1;
+
       return aRelative.localeCompare(bRelative);
     });
 
     // First level should come first
     expect(sorted[0]).toContain('docs/_index.md');
     expect(sorted[1]).toContain('docs/getting-started.md');
-    
+
     // Second level _index files should come before regular files
     const apiIndexPosition = sorted.findIndex(f => f.includes('api/_index.md'));
     const apiEndpointsPosition = sorted.findIndex(f => f.includes('api/endpoints.md'));
@@ -167,7 +168,7 @@ describe('Hierarchy Push Integration', () => {
     // Test would require executing push command with directory
     // This is a conceptual test showing the expected behavior
     expect(createdPages).toEqual([]); // Initially empty
-    
+
     // After pushing directory, we'd expect:
     // 1. Parent pages created first
     // 2. Child pages created with correct parent IDs

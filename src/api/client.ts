@@ -1,6 +1,7 @@
 import type { components, paths } from './types';
 import createClient from 'openapi-fetch';
 import { AuthManager } from '../auth/auth-manager';
+import { logger } from '../utils/logger';
 import { CircuitBreaker, ErrorMapper, isTransientError, RetryHandler } from './circuit-breaker';
 import { RateLimiter } from './rate-limiter';
 
@@ -24,12 +25,27 @@ export class ConfluenceAPIClient {
 
   private constructor() {
     this.authManager = AuthManager.getInstance();
+
+    // Configure fetch with connection pooling (keep-alive enabled by default in Bun)
     this.client = createClient<paths>({
       baseUrl: '',
+      fetch: (input: string | URL | Request, init?: RequestInit) => {
+        // Add keep-alive headers for connection pooling
+        const headers = new Headers(init?.headers);
+        headers.set('Connection', 'keep-alive');
+        headers.set('Keep-Alive', 'timeout=30, max=10');
+
+        return fetch(input, {
+          ...init,
+          headers,
+          // Set request timeout to 30 seconds
+          signal: init?.signal || AbortSignal.timeout(30000),
+        });
+      },
     });
 
-    // Initialize circuit breaker with 5 failures threshold, 30s reset timeout
-    this.circuitBreaker = new CircuitBreaker({
+    // Initialize circuit breaker with singleton pattern
+    this.circuitBreaker = CircuitBreaker.getInstance({
       failureThreshold: 5,
       resetTimeout: 30000,
       successThreshold: 2,
@@ -44,10 +60,12 @@ export class ConfluenceAPIClient {
       jitter: true,
     });
 
-    // Initialize rate limiter for Cloud instances (5000 requests/hour)
-    this.rateLimiter = new RateLimiter({
+    // Initialize rate limiter with singleton pattern
+    this.rateLimiter = RateLimiter.getInstance({
       requestsPerHour: 5000,
       concurrency: 10,
+      readConcurrency: 10,
+      writeConcurrency: 3,
       warnThreshold: 0.8,
     });
   }
@@ -396,6 +414,197 @@ export class ConfluenceAPIClient {
 
       return response.data;
     }, { timeout: 30000 }); // 30s timeout for single folder
+  }
+
+  /**
+   * Get multiple pages by their IDs in a single batch request.
+   * Confluence API supports up to 250 page IDs per request.
+   * @param pageIds Array of page IDs to fetch
+   * @param includeBody Whether to include page body content
+   * @returns Array of pages that were found (may be partial if some IDs don't exist)
+   */
+  public async batchGetPages(pageIds: string[], includeBody = false): Promise<PageSingle[]> {
+    return this.executeWithProtection(async () => {
+      if (pageIds.length === 0) {
+        return [];
+      }
+
+      // Confluence API has a limit of 250 IDs per request
+      const MAX_BATCH_SIZE = 250;
+      const batches: string[][] = [];
+
+      // Split into batches if necessary
+      for (let i = 0; i < pageIds.length; i += MAX_BATCH_SIZE) {
+        batches.push(pageIds.slice(i, i + MAX_BATCH_SIZE));
+      }
+
+      // Process each batch
+      const allPages: PageSingle[] = [];
+
+      for (const batch of batches) {
+        // Convert string IDs to numbers as required by the API
+        const numericIds = batch.map((id) => {
+          const numId = Number.parseInt(id, 10);
+          if (Number.isNaN(numId)) {
+            throw new TypeError(`CS-400: Invalid page ID in batch: ${id}`);
+          }
+          return numId;
+        });
+
+        const response = await this.client.GET('/pages', {
+          params: {
+            query: {
+              'id': numericIds,
+              'limit': MAX_BATCH_SIZE,
+              'body-format': includeBody ? 'storage' : undefined,
+            },
+          },
+        });
+
+        if (response.error) {
+          // Log error but continue with partial results
+          logger.error(`CS-901: Batch request failed for IDs ${batch.join(',')}: ${response.error}`);
+          continue;
+        }
+
+        const pages = response.data?.results || [];
+        allPages.push(...pages);
+      }
+
+      return allPages;
+    }, { timeout: 300000 }); // 5min timeout for batch operations
+  }
+
+  /**
+   * Create multiple pages in batch.
+   * Note: Confluence doesn't have a native batch create endpoint,
+   * so this method uses concurrent requests with rate limiting.
+   * @param pages Array of page data to create
+   * @returns Array of created pages and errors
+   */
+  public async batchCreatePages(
+    pages: Array<{
+      spaceId: string;
+      title: string;
+      body: string;
+      parentId?: string;
+    }>,
+  ): Promise<{
+      successes: PageSingle[];
+      failures: Array<{ index: number; error: string }>;
+    }> {
+    return this.executeWithProtection(async () => {
+      const successes: PageSingle[] = [];
+      const failures: Array<{ index: number; error: string }> = [];
+
+      // Use Promise.allSettled for concurrent creation with error handling
+      const results = await Promise.allSettled(
+        pages.map((page, index) =>
+          this.createPage(page.spaceId, page.title, page.body, page.parentId)
+            .then(result => ({ index, result }))
+            .catch((error) => {
+              failures.push({ index, error: error.message });
+              throw error;
+            }),
+        ),
+      );
+
+      // Process results
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          successes.push(result.value.result);
+        }
+      }
+
+      return { successes, failures };
+    }, { timeout: 600000 }); // 10min timeout for large batch operations
+  }
+
+  /**
+   * Update multiple pages in batch.
+   * Note: Confluence doesn't have a native batch update endpoint,
+   * so this method uses concurrent requests with rate limiting.
+   * @param updates Array of page updates
+   * @returns Array of updated pages and errors
+   */
+  public async batchUpdatePages(
+    updates: Array<{
+      pageId: string;
+      body: string;
+      version: number;
+      title: string;
+    }>,
+  ): Promise<{
+      successes: PageSingle[];
+      failures: Array<{ index: number; error: string }>;
+    }> {
+    return this.executeWithProtection(async () => {
+      const successes: PageSingle[] = [];
+      const failures: Array<{ index: number; error: string }> = [];
+
+      // Use Promise.allSettled for concurrent updates with error handling
+      const results = await Promise.allSettled(
+        updates.map((update, index) =>
+          this.updatePage(update.pageId, update.body, update.version, update.title)
+            .then(result => ({ index, result }))
+            .catch((error) => {
+              failures.push({ index, error: error.message });
+              throw error;
+            }),
+        ),
+      );
+
+      // Process results
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          successes.push(result.value.result);
+        }
+      }
+
+      return { successes, failures };
+    }, { timeout: 600000 }); // 10min timeout for large batch operations
+  }
+
+  /**
+   * Delete multiple pages in batch.
+   * Note: Confluence doesn't have a native batch delete endpoint,
+   * so this method uses concurrent requests with rate limiting.
+   * @param pageIds Array of page IDs to delete
+   * @returns Deletion results with successes and failures
+   */
+  public async batchDeletePages(
+    pageIds: string[],
+  ): Promise<{
+      successes: string[];
+      failures: Array<{ pageId: string; error: string }>;
+    }> {
+    return this.executeWithProtection(async () => {
+      const successes: string[] = [];
+      const failures: Array<{ pageId: string; error: string }> = [];
+
+      // Use Promise.allSettled for concurrent deletion with error handling
+      const results = await Promise.allSettled(
+        pageIds.map(pageId =>
+          this.deletePage(pageId)
+            .then(() => ({ pageId, success: true }))
+            .catch((error) => {
+              failures.push({ pageId, error: error.message });
+              throw error;
+            }),
+        ),
+      );
+
+      // Process results
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i];
+        const pageId = pageIds[i];
+        if (result && pageId && result.status === 'fulfilled') {
+          successes.push(pageId);
+        }
+      }
+
+      return { successes, failures };
+    }, { timeout: 600000 }); // 10min timeout for large batch operations
   }
 
   private async executeWithProtection<T>(

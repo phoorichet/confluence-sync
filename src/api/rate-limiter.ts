@@ -5,44 +5,89 @@ export interface RateLimiterOptions {
   requestsPerHour?: number;
   concurrency?: number;
   warnThreshold?: number;
+  readConcurrency?: number;
+  writeConcurrency?: number;
 }
 
 export class RateLimiter {
+  private static instance: RateLimiter | null = null;
   private readonly requestsPerHour: number;
   private readonly concurrency: number;
   private readonly warnThreshold: number;
+  private readonly readConcurrency: number;
+  private readonly writeConcurrency: number;
   private readonly limiter: ReturnType<typeof pLimit>;
+  private readonly readLimiter: ReturnType<typeof pLimit>;
+  private readonly writeLimiter: ReturnType<typeof pLimit>;
   private requestCount = 0;
   private windowStart = Date.now();
   private rateLimitRemaining?: number;
   private rateLimitReset?: Date;
+  private queuedRequests = 0;
 
-  constructor(options: RateLimiterOptions = {}) {
+  private constructor(options: RateLimiterOptions = {}) {
     this.requestsPerHour = options.requestsPerHour || 5000;
     this.concurrency = options.concurrency || 10;
     this.warnThreshold = options.warnThreshold || 0.8;
+    this.readConcurrency = options.readConcurrency || 10;
+    this.writeConcurrency = options.writeConcurrency || 3;
     this.limiter = pLimit(this.concurrency);
+    this.readLimiter = pLimit(this.readConcurrency);
+    this.writeLimiter = pLimit(this.writeConcurrency);
   }
 
-  public async execute<T>(fn: () => Promise<T>): Promise<T> {
-    return this.limiter(async () => {
-      await this.checkRateLimit();
+  static getInstance(options?: RateLimiterOptions): RateLimiter {
+    if (!RateLimiter.instance) {
+      RateLimiter.instance = new RateLimiter(options);
+    }
+    return RateLimiter.instance;
+  }
 
-      try {
-        const result = await fn();
-        this.incrementRequestCount();
-        return result;
-      }
-      catch (error: any) {
-        // Handle 429 Too Many Requests
-        if (error.status === 429 || error.statusCode === 429) {
-          await this.handleRateLimitError(error);
-          // Retry once after waiting
-          return fn();
+  public async execute<T>(fn: () => Promise<T>, operationType?: 'read' | 'write'): Promise<T> {
+    // Track queued requests
+    this.queuedRequests++;
+
+    const limiter = operationType === 'read'
+      ? this.readLimiter
+      : operationType === 'write'
+        ? this.writeLimiter
+        : this.limiter;
+
+    try {
+      return await limiter(async () => {
+        this.queuedRequests--;
+        await this.checkRateLimit();
+
+        try {
+          const result = await fn();
+          this.incrementRequestCount();
+          return result;
         }
-        throw error;
+        catch (error: any) {
+          // Handle 429 Too Many Requests
+          if (error.status === 429 || error.statusCode === 429) {
+            await this.handleRateLimitError(error);
+            // Retry once after waiting
+            return fn();
+          }
+          throw error;
+        }
+      });
+    }
+    finally {
+      // Ensure queued count is decremented even on error
+      if (this.queuedRequests > 0) {
+        this.queuedRequests--;
       }
-    });
+    }
+  }
+
+  public async executeRead<T>(fn: () => Promise<T>): Promise<T> {
+    return this.execute(fn, 'read');
+  }
+
+  public async executeWrite<T>(fn: () => Promise<T>): Promise<T> {
+    return this.execute(fn, 'write');
   }
 
   private async checkRateLimit(): Promise<void> {
@@ -179,6 +224,7 @@ export class RateLimiter {
     windowStart: Date;
     rateLimitRemaining?: number;
     rateLimitReset?: Date;
+    queuedRequests: number;
   } {
     return {
       requestCount: this.requestCount,
@@ -187,6 +233,7 @@ export class RateLimiter {
       windowStart: new Date(this.windowStart),
       rateLimitRemaining: this.rateLimitRemaining,
       rateLimitReset: this.rateLimitReset,
+      queuedRequests: this.queuedRequests,
     };
   }
 

@@ -16,7 +16,7 @@ describe('SyncEngine', () => {
   let manifestManager: ManifestManager;
   let fileManager: FileManager;
   let changeDetector: ChangeDetector;
-  let conflictResolver: ConflictResolver;
+  let _conflictResolver: ConflictResolver;
   let backupManager: BackupManager;
 
   beforeEach(() => {
@@ -33,7 +33,7 @@ describe('SyncEngine', () => {
     manifestManager = ManifestManager.getInstance();
     fileManager = FileManager.getInstance();
     changeDetector = ChangeDetector.getInstance();
-    conflictResolver = ConflictResolver.getInstance();
+    _conflictResolver = ConflictResolver.getInstance();
     backupManager = BackupManager.getInstance();
 
     // Mock logger
