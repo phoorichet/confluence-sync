@@ -4,15 +4,20 @@ A powerful CLI tool for bidirectional synchronization between Confluence and loc
 
 > **⚠️ Disclaimer**: This is an independent, open-source tool and is not officially associated with, endorsed by, or supported by Atlassian or Confluence. "Confluence" is a trademark of Atlassian Corporation. This tool uses the public Confluence REST API for synchronization purposes.
 
+> **🤖 AI-Powered Development**: This project is built using [Claude Code](https://claude.ai/code) with the [BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD) methodology, combining AI assistance with structured software engineering practices throughout the development lifecycle.
+
 ## Features
 
 - 🔄 Bidirectional sync between Confluence and local Markdown files
 - 📁 Full page hierarchy and space support
 - 🔐 Secure credential storage using system keychain
 - 📝 Confluence storage format to Markdown conversion
+- 👁️ Watch mode for automatic synchronization
 - 🚀 Concurrent operations with rate limiting
 - 🛡️ Conflict detection and resolution
 - 📊 Progress tracking for bulk operations
+- 🔧 Circuit breaker for API resilience
+- 📈 Performance monitoring and caching
 
 ## Installation
 
@@ -39,14 +44,17 @@ bun run build
 Initialize your Confluence sync configuration:
 
 ```bash
-# Bun requires all options to be provided (no interactive mode)
+# Interactive mode (if running with Node.js)
+bun run cli init
+
+# Non-interactive mode (required when using Bun directly)
 bun ./src/cli.ts init --url https://your-domain.atlassian.net --email your@email.com --token YOUR_API_TOKEN
 
 # Optional: specify a custom sync directory
 bun ./src/cli.ts init --url https://your-domain.atlassian.net --email your@email.com --token YOUR_API_TOKEN --dir ./my-docs
 ```
 
-> **Note**: Due to Bun's TTY limitations, interactive prompts are not supported. All required options must be provided via command-line arguments.
+> **Note**: Due to Bun's TTY limitations, interactive prompts are not supported when running directly with Bun. All required options must be provided via command-line arguments.
 
 ## Authentication
 
@@ -161,6 +169,34 @@ bun run cli sync --strategy manual       # Prompt for each conflict (default)
 bun run cli sync --dry-run
 ```
 
+### Watch Mode
+
+#### Automatic Synchronization on File Changes
+
+```bash
+# Start watching for file changes and sync automatically
+bun run cli watch
+
+# Customize debounce delay (milliseconds)
+bun run cli watch --debounce 5000
+
+# Set max retry attempts on failure
+bun run cli watch --retry 5
+
+# Disable desktop notifications
+bun run cli watch --no-notifications
+
+# Output in JSON format for scripting
+bun run cli watch --json
+```
+
+Watch mode features:
+- Monitors all Markdown files for changes
+- Debounces rapid edits to avoid excessive API calls
+- Automatically retries on network failures
+- Respects `.syncignore` patterns
+- Shows real-time status indicators
+
 ### Working with Page Hierarchies
 
 When pulling spaces or recursive pages, the tool preserves the Confluence hierarchy in your local filesystem:
@@ -181,10 +217,43 @@ bun run cli pull --space DOCS --output ./documentation
 # └── 006-troubleshooting.md  # Root-level page
 ```
 
-**Note**: 
+**Note**:
 - Folders with `_index.md` represent pages that have children
 - Direct `.md` files represent leaf pages
 - Numbers prefix (001, 002, etc.) maintain Confluence page ordering
+
+### Status and Health Commands
+
+```bash
+# Show sync status of tracked files
+bun run cli status
+
+# Filter status by space
+bun run cli status --space MYSPACE
+
+# Output status in JSON format
+bun run cli status --json
+
+# Check system health and connectivity
+bun run cli health
+
+# Run all health checks
+bun run cli health --all
+```
+
+### Conflict Resolution
+
+```bash
+# List all conflicted files
+bun run cli conflicts list
+
+# Resolve conflicts interactively
+bun run cli conflicts resolve
+
+# Resolve all conflicts with a strategy
+bun run cli conflicts resolve --strategy local-first
+bun run cli conflicts resolve --strategy remote-first
+```
 
 ### Advanced Options
 
@@ -213,23 +282,52 @@ bun run cli pull --space MYSPACE --rate-limit 100
 
 ## Configuration
 
-The tool stores configuration in `.confluence-sync.json` in your project root:
+The tool stores configuration and sync state in `.confluence-sync.json` in your project root:
 
 ```json
 {
   "version": "2.0.0",
-  "confluenceUrl": "https://mycompany.atlassian.net",
+  "confluenceUrl": "https://mycompany.atlassian.net/wiki/api/v2",
   "lastSyncTime": "2025-01-09T10:30:00Z",
   "syncMode": "manual",
+  "pages": [], // Tracked pages with metadata
+  "spaces": [], // Space information
+  "folders": [], // Folder hierarchy
   "config": {
     "profile": "default",
     "includePatterns": ["**/*.md"],
-    "excludePatterns": ["**/node_modules/**", "**/.git/**"],
+    "excludePatterns": [],
     "concurrentOperations": 5,
     "conflictStrategy": "manual",
     "cacheEnabled": true
   }
 }
+```
+
+### Ignore Patterns
+
+Create a `.syncignore` file to exclude files from synchronization:
+
+```bash
+# Dependencies
+node_modules/
+vendor/
+
+# Build outputs
+dist/
+build/
+
+# IDE files
+.idea/
+.vscode/
+
+# Temporary files
+*.tmp
+*.swp
+
+# Custom patterns
+drafts/
+**/README.md
 ```
 
 ## Manifest File
@@ -242,17 +340,46 @@ The tool maintains a `.confluence-sync.json` manifest that tracks:
 
 **Note**: This file should be committed to version control to maintain sync state across team members.
 
+## Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `auth` | Manage authentication (login/logout/status) |
+| `completion` | Generate shell completion scripts |
+| `conflicts` | Manage and resolve sync conflicts |
+| `health` | Check system health and connectivity |
+| `init` | Initialize sync configuration |
+| `pull` | Pull pages from Confluence |
+| `push` | Push files to Confluence |
+| `status` | Show sync status |
+| `sync` | Bidirectional synchronization |
+| `watch` | Watch for changes and sync automatically |
+
 ## Error Codes
 
 The tool uses specific error code ranges for different types of issues:
 
-- `CS-400` to `CS-499`: Client errors (invalid input, missing parameters)
-- `CS-500` to `CS-599`: Server/API errors
-- `CS-600` to `CS-699`: File system errors
-- `CS-700` to `CS-799`: Sync operation errors
-- `CS-800` to `CS-899`: Hierarchy and space errors
+- `CS-100` to `CS-199`: Authentication errors
+- `CS-200` to `CS-299`: API errors
+- `CS-300` to `CS-399`: File system errors
+- `CS-400` to `CS-499`: Sync errors
+- `CS-500` to `CS-599`: Network errors
+- `CS-600` to `CS-699`: Conflict errors
+- `CS-700` to `CS-799`: Configuration errors
+- `CS-800` to `CS-899`: Hierarchy errors
+- `CS-900` to `CS-999`: Performance errors
+- `CS-1000` to `CS-1099`: CLI errors
+- `CS-1100` to `CS-1199`: Watch mode errors
 
 ## Development
+
+This project is developed using [Claude Code](https://claude.ai/code) with the **BMAD method** (Business-Minded Agile Development). BMAD is a structured approach that combines business requirements, agile methodologies, and AI-assisted development to create high-quality software efficiently.
+
+The codebase includes:
+- User stories in `docs/stories/` following BMAD format
+- Architecture documentation in `docs/architecture/`
+- Product requirements in `docs/prd/`
+- Development guidance in `CLAUDE.md` for AI-assisted coding
 
 ### Running Tests
 

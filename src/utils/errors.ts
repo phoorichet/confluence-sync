@@ -138,7 +138,7 @@ const ERROR_SUGGESTIONS: Map<string, ErrorSuggestion> = new Map([
     message: 'Configuration file not found',
     suggestions: [
       'Run "confluence-sync init" to create a configuration',
-      'Check if .confluence-sync.yml exists in the current directory',
+      'Check if .confluence-sync.json exists in the current directory',
       'Specify the config file path using --config flag',
     ],
   }],
@@ -146,7 +146,7 @@ const ERROR_SUGGESTIONS: Map<string, ErrorSuggestion> = new Map([
     code: 'CS-702',
     message: 'Invalid configuration',
     suggestions: [
-      'Check the YAML syntax in .confluence-sync.yml',
+      'Check the JSON syntax in .confluence-sync.json',
       'Ensure all required fields are present',
       'Run "confluence-sync config validate" to check configuration',
     ],
@@ -264,12 +264,14 @@ export class CommandSuggester {
       for (let j = 1; j <= a.length; j++) {
         const currentRow = matrix[i];
         const prevRow = matrix[i - 1];
-        
-        if (!currentRow || !prevRow) continue;
-        
+
+        if (!currentRow || !prevRow)
+          continue;
+
         const prevValue = prevRow[j - 1];
-        if (prevValue === undefined) continue;
-        
+        if (prevValue === undefined)
+          continue;
+
         if (b.charAt(i - 1) === a.charAt(j - 1)) {
           currentRow[j] = prevValue;
         }
@@ -277,7 +279,7 @@ export class CommandSuggester {
           const substitution = prevValue + 1;
           const insertion = currentRow[j - 1] ?? Number.MAX_SAFE_INTEGER;
           const deletion = prevRow[j] ?? Number.MAX_SAFE_INTEGER;
-          
+
           currentRow[j] = Math.min(substitution, insertion + 1, deletion + 1);
         }
       }

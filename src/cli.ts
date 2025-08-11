@@ -11,6 +11,7 @@ import { pullCommand } from './commands/pull.js';
 import { pushCommand } from './commands/push.js';
 import { statusCommand } from './commands/status.js';
 import { syncCommand } from './commands/sync.js';
+import { watchCommand } from './commands/watch.js';
 import { getPackageInfo } from './utils/package-info.js';
 
 // Get package information
@@ -34,6 +35,7 @@ program.addCommand(pullCommand);
 program.addCommand(pushCommand);
 program.addCommand(statusCommand);
 program.addCommand(syncCommand);
+program.addCommand(watchCommand);
 
 // Parse command line arguments
 program.parse(process.argv);

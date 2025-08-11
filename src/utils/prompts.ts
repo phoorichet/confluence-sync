@@ -32,7 +32,7 @@ class PromptManager {
     // Check if TTY is available
     const hasStdinTTY = Boolean(process.stdin.isTTY);
     const hasStdoutTTY = Boolean(process.stdout.isTTY);
-    
+
     // Some environments (like VS Code terminal) might not set TTY correctly
     // Also check if we're explicitly forcing interactive mode
     const forceInteractive = process.env.FORCE_INTERACTIVE === 'true';
@@ -75,7 +75,7 @@ class PromptManager {
     try {
       // Cancel any previous prompts to avoid conflicts
       prompts.inject([]);
-      
+
       const response = await prompts({
         type: 'text',
         name: 'value',
@@ -97,7 +97,8 @@ class PromptManager {
       }
 
       return String(response.value);
-    } catch (error) {
+    }
+    catch (error) {
       // If it's already our error, rethrow it
       if (error instanceof ConfluenceSyncError) {
         throw error;
@@ -117,7 +118,7 @@ class PromptManager {
 
     try {
       prompts.inject([]);
-      
+
       const response = await prompts({
         type: 'password',
         name: 'value',
@@ -133,7 +134,8 @@ class PromptManager {
       }
 
       return String(response.value);
-    } catch (error) {
+    }
+    catch (error) {
       if (error instanceof ConfluenceSyncError) {
         throw error;
       }
@@ -148,7 +150,7 @@ class PromptManager {
 
     try {
       prompts.inject([]);
-      
+
       const response = await prompts({
         type: 'confirm',
         name: 'value',
@@ -165,7 +167,8 @@ class PromptManager {
       }
 
       return Boolean(response.value);
-    } catch {
+    }
+    catch {
       return defaultValue;
     }
   }

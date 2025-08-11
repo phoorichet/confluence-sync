@@ -148,13 +148,13 @@ export class OutputFormatter {
       });
 
       // Print header
-      const headerRow = headers.map((h, i) => h.padEnd(widths[i])).join(' | ');
+      const headerRow = headers.map((h, i) => h.padEnd(widths[i] ?? 0)).join(' | ');
       console.log(chalk.bold(headerRow));
       console.log(widths.map(w => '-'.repeat(w)).join('-+-'));
 
       // Print rows
       rows.forEach((row) => {
-        const rowStr = row.map((cell, i) => (cell || '').padEnd(widths[i])).join(' | ');
+        const rowStr = row.map((cell, i) => (cell || '').padEnd(widths[i] ?? 0)).join(' | ');
         console.log(rowStr);
       });
     }
@@ -187,6 +187,34 @@ export class OutputFormatter {
 }
 
 export const outputFormatter = OutputFormatter.getInstance();
+
+/**
+ * Format a timestamp for display
+ */
+export function formatTimestamp(date: Date): string {
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (seconds < 60) {
+    return 'just now';
+  }
+  else if (minutes < 60) {
+    return `${minutes}m ago`;
+  }
+  else if (hours < 24) {
+    return `${hours}h ago`;
+  }
+  else if (days < 7) {
+    return `${days}d ago`;
+  }
+  else {
+    return date.toLocaleDateString();
+  }
+}
 
 /**
  * JSON Schema definitions for output types
@@ -329,16 +357,15 @@ export function withJsonOutput(target: any, propertyKey: string, descriptor: Pro
     }
     catch (error) {
       if (outputFormatter.isJsonMode()) {
+        const err = error as any;
         outputFormatter.error(
-          error.code || 'CS-001',
-          error.message || 'Unknown error',
-          error.suggestions,
+          err.code || 'CS-001',
+          err.message || 'Unknown error',
+          err.suggestions,
         );
         throw error;
       }
       throw error;
     }
   };
-
-  return descriptor;
 }

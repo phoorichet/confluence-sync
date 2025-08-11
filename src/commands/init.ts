@@ -4,29 +4,13 @@ import process from 'node:process';
 import chalk from 'chalk';
 import { Command } from 'commander';
 import ora from 'ora';
-import yaml from 'yaml';
+// import yaml from 'yaml'; // No longer needed, using JSON instead
 import { AuthManager } from '../auth/auth-manager';
 import { ManifestManager } from '../storage/manifest-manager';
 import { logger } from '../utils/logger';
 import { promptManager } from '../utils/prompts';
 
-interface InitConfig {
-  readonly confluence: {
-    readonly url: string;
-    readonly username: string;
-    readonly authType: 'cloud' | 'server';
-  };
-  readonly sync: {
-    readonly directory: string;
-    readonly patterns: readonly string[];
-  };
-  readonly options: {
-    readonly interactive: boolean;
-    readonly colors: boolean;
-    readonly progressBars: boolean;
-    readonly jsonOutput: boolean;
-  };
-}
+// Configuration interface removed - using ManifestManager structure instead
 
 export const initCommand = new Command('init')
   .description('Initialize a new Confluence sync configuration')
@@ -46,7 +30,7 @@ export const initCommand = new Command('init')
       const isBunEnvironment = typeof Bun !== 'undefined';
       const canRunInteractive = !isBunEnvironment && promptManager.isInteractive() && !options.noInteractive;
       const hasRequiredOptions = options.url && options.email && options.token;
-      
+
       // If we can't run interactively and don't have required options, show help
       if (!canRunInteractive && !hasRequiredOptions) {
         console.error(chalk.red('\n❌ Interactive mode is not available when using Bun\n'));
@@ -59,14 +43,14 @@ export const initCommand = new Command('init')
         console.log(chalk.gray('  --dir <directory>  Directory to sync files (optional, default: ./confluence-docs)'));
         console.log(chalk.gray('\nExample:'));
         console.log(chalk.green('  bun ./src/cli.ts init --url https://mycompany.atlassian.net --email user@example.com --token abc123\n'));
-        
+
         if (!isBunEnvironment) {
           console.log(chalk.yellow('\nAlternatively, if you have Node.js installed, you can run:'));
           console.log(chalk.green('  node ./dist/cli.js init\n'));
         }
         process.exit(1);
       }
-      
+
       const isInteractive = canRunInteractive && !hasRequiredOptions;
 
       // Welcome message
@@ -164,48 +148,9 @@ export const initCommand = new Command('init')
             )];
       }
 
-      // Step 5: CLI Options
-      let enableColors = true;
-      let enableProgress = true;
-      let enableInteractive = true;
+      // Step 5: CLI Options (removed - these are runtime options, not stored in manifest)
 
-      if (isInteractive) {
-        console.log(chalk.cyan('\n⚙️  CLI Preferences\n'));
-
-        enableColors = await promptManager.confirm('Enable colored output?', true);
-        enableProgress = await promptManager.confirm('Show progress bars?', true);
-        enableInteractive = await promptManager.confirm('Enable interactive mode by default?', true);
-      }
-
-      // Create configuration
-      const config: InitConfig = Object.freeze({
-        confluence: Object.freeze({
-          url: confluenceUrl,
-          username,
-          authType,
-        }),
-        sync: Object.freeze({
-          directory: syncDirectory,
-          patterns: Object.freeze(patterns),
-        }),
-        options: Object.freeze({
-          interactive: enableInteractive,
-          colors: enableColors,
-          progressBars: enableProgress,
-          jsonOutput: false,
-        }),
-      });
-
-      // Step 6: Save configuration
-      spinner.start('Saving configuration...');
-
-      const configPath = path.join(process.cwd(), '.confluence-sync.yml');
-      const configYaml = yaml.stringify(config);
-      await fs.writeFile(configPath, configYaml, 'utf-8');
-
-      spinner.succeed(chalk.green('Configuration saved to .confluence-sync.yml'));
-
-      // Step 7: Authenticate
+      // Step 6: Authenticate first (before creating manifest)
       spinner.start('Authenticating with Confluence...');
 
       const authManager = AuthManager.getInstance();
@@ -218,7 +163,7 @@ export const initCommand = new Command('init')
 
       spinner.succeed(chalk.green('Authentication successful!'));
 
-      // Step 8: Create sync directory
+      // Step 7: Create sync directory
       spinner.start('Creating sync directory...');
 
       const absoluteSyncDir = path.resolve(syncDirectory);
@@ -226,22 +171,27 @@ export const initCommand = new Command('init')
 
       spinner.succeed(chalk.green(`Created sync directory at ${absoluteSyncDir}`));
 
-      // Step 9: Initialize manifest
+      // Step 8: Initialize manifest with proper configuration
       spinner.start('Initializing sync manifest...');
 
-      // Change to the sync directory for manifest creation
-      const originalCwd = process.cwd();
-      process.chdir(absoluteSyncDir);
-
+      // Create manifest in the current directory (not in sync directory)
       const manifestManager = ManifestManager.getInstance();
-      await manifestManager.load(); // This will create a new manifest if it doesn't exist
-
-      // Change back to original directory
-      process.chdir(originalCwd);
+      
+      // Load will create a new manifest with the stored credentials URL
+      await manifestManager.load();
+      
+      // Update the config section with user preferences
+      const manifest = await manifestManager.getManifest();
+      if (manifest && manifest.config) {
+        manifest.config.includePatterns = patterns;
+        manifest.config.excludePatterns = [];
+        // Save the updated manifest
+        await manifestManager.save();
+      }
 
       spinner.succeed(chalk.green('Sync manifest initialized'));
 
-      // Step 10: Create .gitignore
+      // Step 9: Create .gitignore
       if (isInteractive) {
         const addGitignore = await promptManager.confirm(
           '\nWould you like to add .confluence-sync.json to .gitignore?',

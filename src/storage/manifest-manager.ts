@@ -348,6 +348,16 @@ export class ManifestManager {
   }
 
   /**
+   * Get the current manifest
+   */
+  async getManifest(): Promise<SyncManifest | null> {
+    if (!this.manifest) {
+      await this.load();
+    }
+    return this.manifest;
+  }
+
+  /**
    * Save manifest to disk
    */
   async save(): Promise<void> {
