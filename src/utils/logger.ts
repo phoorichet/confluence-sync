@@ -1,3 +1,4 @@
+import process from 'node:process';
 import chalk from 'chalk';
 
 export enum LogLevel {
@@ -7,11 +8,26 @@ export enum LogLevel {
   ERROR = 3,
 }
 
+export interface LoggerConfig {
+  colors: boolean;
+  logLevel: LogLevel;
+}
+
 export class Logger {
   private static instance: Logger;
   private logLevel: LogLevel = LogLevel.INFO;
+  private colorsEnabled: boolean = true;
 
-  private constructor() {}
+  private constructor() {
+    // Detect if colors should be disabled
+    if (process.env.NO_COLOR || process.env.CI === 'true' || !process.stdout.isTTY) {
+      this.colorsEnabled = false;
+    }
+    else {
+      // Check if terminal supports color
+      this.colorsEnabled = process.stdout.isTTY || false;
+    }
+  }
 
   public static getInstance(): Logger {
     if (!Logger.instance) {
@@ -24,33 +40,41 @@ export class Logger {
     this.logLevel = level;
   }
 
+  public setColors(enabled: boolean): void {
+    this.colorsEnabled = enabled;
+  }
+
+  private colorize(text: string, colorFn: typeof chalk.blue): string {
+    return this.colorsEnabled ? colorFn(text) : text;
+  }
+
   public debug(message: string, ...args: any[]): void {
     if (this.logLevel <= LogLevel.DEBUG) {
-      console.log(chalk.gray(`[DEBUG] ${message}`), ...args);
+      console.log(this.colorize(`[DEBUG] ${message}`, chalk.gray), ...args);
     }
   }
 
   public info(message: string, ...args: any[]): void {
     if (this.logLevel <= LogLevel.INFO) {
-      console.log(chalk.blue(`[INFO] ${message}`), ...args);
+      console.log(this.colorize(`[INFO] ${message}`, chalk.blue), ...args);
     }
   }
 
   public warn(message: string, ...args: any[]): void {
     if (this.logLevel <= LogLevel.WARN) {
-      console.warn(chalk.yellow(`[WARN] ${message}`), ...args);
+      console.warn(this.colorize(`[WARN] ${message}`, chalk.yellow), ...args);
     }
   }
 
   public error(message: string, ...args: any[]): void {
     if (this.logLevel <= LogLevel.ERROR) {
       const sanitizedArgs = args.map(arg => this.sanitizeForLogging(arg));
-      console.error(chalk.red(`[ERROR] ${message}`), ...sanitizedArgs);
+      console.error(this.colorize(`[ERROR] ${message}`, chalk.red), ...sanitizedArgs);
     }
   }
 
   public success(message: string, ...args: any[]): void {
-    console.log(chalk.green(`[SUCCESS] ${message}`), ...args);
+    console.log(this.colorize(`✅ ${message}`, chalk.green), ...args);
   }
 
   private sanitizeForLogging(value: any): any {

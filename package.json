@@ -65,6 +65,7 @@
     "openapi-fetch": "0.14.0",
     "ora": "^8.2.0",
     "p-limit": "6.2.0",
+    "prompts": "^2.4.2",
     "remark": "^15.0.1",
     "remark-gfm": "^4.0.1",
     "remark-parse": "^11.0.0",
@@ -75,6 +76,7 @@
   "devDependencies": {
     "@nyxb/eslint-config": "^3.1.0",
     "@types/bun": "latest",
+    "@types/prompts": "^2.4.9",
     "eslint": "^9.32.0",
     "msw": "2.10.4",
     "node-html-parser": "^7.0.1",

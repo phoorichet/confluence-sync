@@ -76,7 +76,6 @@ describe('FileManager Streaming Operations', () => {
 
     it('should throw error for non-existent file', async () => {
       expect(async () => {
-        // eslint-disable-next-line unused-imports/no-unused-vars
         for await (const _chunk of fileManager.readFileStream('/non/existent/file.txt')) {
           // Should not reach here
         }

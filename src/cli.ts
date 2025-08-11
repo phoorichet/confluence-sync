@@ -3,8 +3,10 @@
 import process from 'node:process';
 import { Command } from 'commander';
 import { authCommand } from './commands/auth.js';
+import { completionCommand } from './commands/completion.js';
 import { conflictsCommand } from './commands/conflicts.js';
 import { healthCommand } from './commands/health.js';
+import { initCommand } from './commands/init.js';
 import { pullCommand } from './commands/pull.js';
 import { pushCommand } from './commands/push.js';
 import { statusCommand } from './commands/status.js';
@@ -24,8 +26,10 @@ program
 
 // Register commands
 program.addCommand(authCommand);
+program.addCommand(completionCommand);
 program.addCommand(conflictsCommand);
 program.addCommand(healthCommand);
+program.addCommand(initCommand);
 program.addCommand(pullCommand);
 program.addCommand(pushCommand);
 program.addCommand(statusCommand);

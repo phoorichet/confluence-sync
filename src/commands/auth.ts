@@ -3,6 +3,7 @@ import chalk from 'chalk';
 import { Command } from 'commander';
 import ora from 'ora';
 import { AuthManager, type Credentials } from '../auth/auth-manager';
+import { promptManager } from '../utils/prompts';
 
 const authManager = AuthManager.getInstance();
 
@@ -21,32 +22,25 @@ export const authCommand = new Command('auth')
     try {
       if (!url) {
         spinner.stop();
-        const { default: inquirer } = await import('inquirer');
-        const answers = await inquirer.prompt([
-          {
-            type: 'input',
-            name: 'url',
-            message: 'Enter your Confluence URL:',
-            validate: (input: string) => {
-              try {
-                const url = new URL(input);
-                // Validate it's HTTPS for security
-                if (url.protocol !== 'https:') {
-                  return 'Please use HTTPS for secure connection';
-                }
-                // Validate it looks like a Confluence URL
-                if (!url.hostname || url.hostname === 'localhost') {
-                  return 'Please enter a valid Confluence URL';
-                }
-                return true;
+        url = await promptManager.text('Enter your Confluence URL:', {
+          validate: (input: string) => {
+            try {
+              const url = new URL(input);
+              // Validate it's HTTPS for security
+              if (url.protocol !== 'https:') {
+                return 'Please use HTTPS for secure connection';
               }
-              catch {
-                return 'Please enter a valid URL (e.g., https://your-domain.atlassian.net)';
+              // Validate it looks like a Confluence URL
+              if (!url.hostname || url.hostname === 'localhost') {
+                return 'Please enter a valid Confluence URL';
               }
-            },
+              return true;
+            }
+            catch {
+              return 'Please enter a valid URL (e.g., https://your-domain.atlassian.net)';
+            }
           },
-        ]);
-        url = answers.url;
+        });
         spinner.start();
       }
 
@@ -61,32 +55,20 @@ export const authCommand = new Command('auth')
 
       if (!username) {
         spinner.stop();
-        const { default: inquirer } = await import('inquirer');
-        const answers = await inquirer.prompt([
+        username = await promptManager.text(
+          authType === 'cloud' ? 'Enter your email:' : 'Enter your username:',
           {
-            type: 'input',
-            name: 'username',
-            message: authType === 'cloud' ? 'Enter your email:' : 'Enter your username:',
             validate: (input: string) => input.length > 0 || 'This field is required',
           },
-        ]);
-        username = answers.username;
+        );
         spinner.start();
       }
 
       if (!apiToken) {
         spinner.stop();
-        const { default: inquirer } = await import('inquirer');
-        const answers = await inquirer.prompt([
-          {
-            type: 'password',
-            name: 'apiToken',
-            message: authType === 'cloud' ? 'Enter your API token:' : 'Enter your Personal Access Token:',
-            mask: '*',
-            validate: (input: string) => input.length > 0 || 'This field is required',
-          },
-        ]);
-        apiToken = answers.apiToken;
+        apiToken = await promptManager.password(
+          authType === 'cloud' ? 'Enter your API token:' : 'Enter your Personal Access Token:',
+        );
         spinner.start();
       }
 
@@ -219,17 +201,9 @@ authCommand
         return;
       }
 
-      const { default: inquirer } = await import('inquirer');
       spinner.stop();
 
-      const { confirm } = await inquirer.prompt([
-        {
-          type: 'confirm',
-          name: 'confirm',
-          message: `Remove credentials for ${credentials.url}?`,
-          default: false,
-        },
-      ]);
+      const confirm = await promptManager.confirm(`Remove credentials for ${credentials.url}?`, false);
 
       if (confirm) {
         spinner.start('Removing credentials...');

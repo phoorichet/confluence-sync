@@ -28,7 +28,7 @@ describe('Batch API Operations', () => {
 
       // Mock the GET /pages endpoint
       const getSpy = spyOn(apiClient as any, 'client').mockImplementation({
-        GET: async (path: string, options: any) => {
+        GET: async (path: string, _options: any) => {
           if (path === '/pages') {
             return {
               data: { results: mockPages },

@@ -44,7 +44,6 @@ export class Cache {
     }, 60000); // Run every minute
   }
 
-
   static getInstance(options?: CacheOptions): Cache {
     if (!Cache.instance) {
       Cache.instance = new Cache(options);

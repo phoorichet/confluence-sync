@@ -8,7 +8,7 @@ import { ManifestManager } from '../../src/storage/manifest-manager';
 
 describe('Performance Regression Tests', () => {
   const testDir = path.join(import.meta.dir, 'test-performance');
-  const manifestPath = path.join(testDir, '.confluence-sync.json');
+  const _manifestPath = path.join(testDir, '.confluence-sync.json');
 
   beforeEach(() => {
     // Create test directory

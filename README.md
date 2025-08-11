@@ -2,6 +2,8 @@
 
 A powerful CLI tool for bidirectional synchronization between Confluence and local Markdown files. Built with TypeScript and Bun runtime for optimal performance.
 
+> **⚠️ Disclaimer**: This is an independent, open-source tool and is not officially associated with, endorsed by, or supported by Atlassian or Confluence. "Confluence" is a trademark of Atlassian Corporation. This tool uses the public Confluence REST API for synchronization purposes.
+
 ## Features
 
 - 🔄 Bidirectional sync between Confluence and local Markdown files
@@ -31,6 +33,20 @@ bun install
 ```bash
 bun run build
 ```
+
+### Initial Setup
+
+Initialize your Confluence sync configuration:
+
+```bash
+# Bun requires all options to be provided (no interactive mode)
+bun ./src/cli.ts init --url https://your-domain.atlassian.net --email your@email.com --token YOUR_API_TOKEN
+
+# Optional: specify a custom sync directory
+bun ./src/cli.ts init --url https://your-domain.atlassian.net --email your@email.com --token YOUR_API_TOKEN --dir ./my-docs
+```
+
+> **Note**: Due to Bun's TTY limitations, interactive prompts are not supported. All required options must be provided via command-line arguments.
 
 ## Authentication
 

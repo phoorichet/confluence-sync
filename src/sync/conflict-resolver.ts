@@ -2,8 +2,10 @@ import type { BackupManager } from '../storage/backup-manager.js';
 import type { FileManager } from '../storage/file-manager.js';
 import type { ManifestManager, ResolutionRecord as ManifestResolutionRecord } from '../storage/manifest-manager.js';
 import path from 'node:path';
+import chalk from 'chalk';
 import * as Diff from 'diff';
 import { logger } from '../utils/logger.js';
+import { promptManager } from '../utils/prompts.js';
 
 export type ConflictStrategy = 'manual' | 'local-first' | 'remote-first';
 
@@ -289,6 +291,108 @@ ${remoteMarker}`;
     );
 
     return diff;
+  }
+
+  /**
+   * Format diff output with colors for terminal display
+   */
+  formatColoredDiff(localContent: string, remoteContent: string): string {
+    const changes = Diff.diffLines(localContent, remoteContent);
+    let output = '';
+
+    changes.forEach((part) => {
+      const prefix = part.added ? '+' : part.removed ? '-' : ' ';
+      const color = part.added ? chalk.green : part.removed ? chalk.red : chalk.gray;
+
+      const lines = part.value.split('\n').filter(line => line);
+      lines.forEach((line) => {
+        output += color(`${prefix} ${line}\n`);
+      });
+    });
+
+    return output;
+  }
+
+  /**
+   * Interactively resolve a conflict
+   */
+  async resolveConflictInteractive(
+    pageId: string,
+    localContent: string,
+    remoteContent: string,
+    pageName?: string,
+  ): Promise<void> {
+    try {
+      const manifest = await this.manifestManager.load();
+      const page = manifest.pages.get(pageId);
+
+      if (!page) {
+        throw new Error(`CS-607: Page ${pageId} not found in manifest`);
+      }
+
+      if (page.status !== 'conflicted') {
+        logger.info(`Page ${pageId} is not in conflict`);
+        return;
+      }
+
+      // Display conflict information
+      console.log(chalk.yellow('\n⚠️  Conflict detected!'));
+      console.log(chalk.gray(`Page: ${pageName || page.localPath}`));
+      console.log(chalk.gray(`Local Path: ${page.localPath}`));
+      console.log('');
+
+      // Show diff
+      const showDiff = await promptManager.confirm('Would you like to see the differences?', true);
+
+      if (showDiff) {
+        console.log(chalk.cyan('\n📝 Differences:\n'));
+        console.log(this.formatColoredDiff(localContent, remoteContent));
+      }
+
+      // Ask for resolution strategy
+      const strategy = await promptManager.select<ConflictStrategy>(
+        'How would you like to resolve this conflict?',
+        [
+          {
+            title: 'Keep local version',
+            value: 'local-first',
+            description: 'Use your local changes and discard remote changes',
+          },
+          {
+            title: 'Keep remote version',
+            value: 'remote-first',
+            description: 'Use remote changes and discard your local changes',
+          },
+          {
+            title: 'Resolve manually',
+            value: 'manual',
+            description: 'Edit the file manually to resolve conflicts',
+          },
+        ],
+      );
+
+      if (strategy === 'manual') {
+        // Write conflict markers to file
+        await this.writeConflictFile(page.localPath, localContent, remoteContent);
+        console.log(chalk.yellow('\n📝 Conflict markers have been added to the file.'));
+        console.log(chalk.gray(`Please edit ${page.localPath} to resolve conflicts.`));
+        console.log(chalk.gray('Look for <<<<<<< LOCAL and >>>>>>> REMOTE markers.'));
+        console.log(chalk.gray('After resolving, run the sync command again.'));
+      }
+      else {
+        // Resolve automatically
+        await this.resolveConflict(pageId, strategy, localContent, remoteContent);
+        console.log(chalk.green(`✅ Conflict resolved using ${strategy === 'local-first' ? 'local' : 'remote'} version`));
+      }
+    }
+    catch (error) {
+      if (error instanceof Error && error.message.includes('CS-1002')) {
+        // User cancelled
+        console.log(chalk.gray('\nConflict resolution cancelled.'));
+        return;
+      }
+      throw error;
+    }
   }
 
   /**
