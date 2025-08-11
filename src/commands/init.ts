@@ -176,10 +176,10 @@ export const initCommand = new Command('init')
 
       // Create manifest in the current directory (not in sync directory)
       const manifestManager = ManifestManager.getInstance();
-      
+
       // Load will create a new manifest with the stored credentials URL
       await manifestManager.load();
-      
+
       // Update the config section with user preferences
       const manifest = await manifestManager.getManifest();
       if (manifest && manifest.config) {

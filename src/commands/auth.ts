@@ -12,6 +12,7 @@ export const authCommand = new Command('auth')
   .option('-u, --url <url>', 'Confluence instance URL')
   .option('-e, --email <email>', 'Your email or username')
   .option('-t, --token <token>', 'API token or Personal Access Token')
+  .option('-p, --profile <name>', 'Configuration profile to use')
   .action(async (options) => {
     const spinner = ora('Authenticating with Confluence...').start();
     let url = options.url;
