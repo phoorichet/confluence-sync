@@ -148,7 +148,7 @@ describe('confluence API Integration', () => {
     });
   });
 
-  describe('aPI Operations', () => {
+  describe('test API Operations', () => {
     it('should get a page successfully', async () => {
       server.use(
         http.get('*/api/v2/pages/:id', () => {

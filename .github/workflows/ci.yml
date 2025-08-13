@@ -19,8 +19,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install libsecret
-        run: sudo apt-get update && sudo apt-get install -y libsecret-1-0
+      - name: Install zowe
+        run: sudo apt-get update && sudo apt-get install -y build-essential libsecret-1-dev
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
