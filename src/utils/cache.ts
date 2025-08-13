@@ -25,6 +25,7 @@ export class Cache {
   private currentSize = 0;
   private hits = 0;
   private misses = 0;
+  private cleanupTimer: NodeJS.Timeout | null = null;
 
   private constructor(options: CacheOptions = {}) {
     this.maxSize = options.maxSize || 100 * 1024 * 1024; // 100MB default
@@ -39,9 +40,13 @@ export class Cache {
    * Periodically clean up expired entries to prevent memory leaks
    */
   private startCleanupTimer(): void {
-    setInterval(() => {
+    this.cleanupTimer = setInterval(() => {
       this.cleanupExpired();
     }, 60000); // Run every minute
+    // Unref the timer so it doesn't keep the process alive
+    if (this.cleanupTimer && typeof this.cleanupTimer.unref === 'function') {
+      this.cleanupTimer.unref();
+    }
   }
 
   static getInstance(options?: CacheOptions): Cache {
@@ -152,6 +157,20 @@ export class Cache {
     this.hits = 0;
     this.misses = 0;
     logger.info('Cache cleared');
+  }
+
+  /**
+   * Stop the cleanup timer and reset the singleton instance
+   */
+  static destroy(): void {
+    if (Cache.instance) {
+      if (Cache.instance.cleanupTimer) {
+        clearInterval(Cache.instance.cleanupTimer);
+        Cache.instance.cleanupTimer = null;
+      }
+      Cache.instance.clear();
+      Cache.instance = null;
+    }
   }
 
   /**

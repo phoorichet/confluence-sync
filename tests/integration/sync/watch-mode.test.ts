@@ -1,18 +1,35 @@
-import type { ConfigManager } from '../../../src/config/config-manager';
 import type { ManifestManager, SyncManifest } from '../../../src/storage/manifest-manager';
 import type { SyncEngine } from '../../../src/sync/engine';
 import type { WatchConfig } from '../../../src/types/watch';
+import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FileWatcher } from '../../../src/storage/watcher';
+
+// Create a mock FSWatcher
+class MockFSWatcher extends EventEmitter {
+  close = vi.fn().mockResolvedValue(undefined);
+}
+
+let mockWatcher: MockFSWatcher;
+
+vi.mock('chokidar', () => ({
+  default: {
+    watch: vi.fn(() => {
+      mockWatcher = new MockFSWatcher();
+      // Simulate ready event after a tick
+      process.nextTick(() => mockWatcher.emit('ready'));
+      return mockWatcher;
+    }),
+  },
+}));
 
 describe('watch Mode Integration', () => {
   let tempDir: string;
   let watcher: FileWatcher | null = null;
   let syncEngine: SyncEngine;
   let manifestManager: ManifestManager;
-  let _configManager: ConfigManager;
   let originalCwd: string;
 
   beforeEach(async () => {
@@ -99,13 +116,6 @@ describe('watch Mode Integration', () => {
       save: vi.fn().mockResolvedValue(undefined),
     } as any;
 
-    _configManager = {
-      loadConfig: vi.fn().mockResolvedValue({
-        confluenceUrl: 'https://test.atlassian.net',
-        syncDirectory: '.',
-      }),
-    } as any;
-
     syncEngine = {
       sync: vi.fn().mockResolvedValue({
         synced: 1,
@@ -167,8 +177,11 @@ describe('watch Mode Integration', () => {
     // Modify a file
     await fs.writeFile('test1.md', '# Test 1 Modified');
 
-    // Wait for file stability (500ms) + debounce (100ms) + processing
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Simulate file change event from chokidar
+    mockWatcher.emit('change', 'test1.md');
+
+    // Wait for debounce (100ms) + processing
+    await new Promise(resolve => setTimeout(resolve, 300));
 
     expect(changeEvents.length).toBeGreaterThan(0);
     expect(syncEngine.sync).toHaveBeenCalled();
@@ -197,8 +210,13 @@ describe('watch Mode Integration', () => {
     await fs.writeFile('docs/test2.md', '# Modified 2');
     await fs.writeFile('test3.md', '# New file');
 
-    // Wait for file stability (500ms) + debounce (200ms) + processing
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Simulate file change events from chokidar
+    mockWatcher.emit('change', 'test1.md');
+    mockWatcher.emit('change', 'docs/test2.md');
+    mockWatcher.emit('add', 'test3.md');
+
+    // Wait for debounce (200ms) + processing
+    await new Promise(resolve => setTimeout(resolve, 400));
 
     // Should batch all changes into one sync
     expect(syncEngine.sync).toHaveBeenCalledTimes(1);
@@ -234,8 +252,12 @@ describe('watch Mode Integration', () => {
     // Create file that should trigger
     await fs.writeFile('valid.md', '# Valid');
 
-    // Wait for file stability (500ms) + debounce (100ms) + processing
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Simulate file change events from chokidar
+    // Only emit the valid.md event (chokidar would ignore the others due to patterns)
+    mockWatcher.emit('add', 'valid.md');
+
+    // Wait for debounce (100ms) + processing
+    await new Promise(resolve => setTimeout(resolve, 300));
 
     // Should only detect valid.md
     const validChanges = changeEvents.filter(f => !f.includes('.tmp') && !f.includes('node_modules'));
@@ -282,8 +304,12 @@ describe('watch Mode Integration', () => {
     // Trigger a change
     await fs.writeFile('test1.md', '# Modified');
 
-    // Wait for file stability (500ms) + debounce (100ms) + retry delays
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Simulate file change event from chokidar
+    mockWatcher.emit('change', 'test1.md');
+
+    // Wait for initial sync to fail, then retry
+    // debounce (100ms) + initial sync failure + retry delay (50ms) + retry execution
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     expect(retryEvents).toContain(1);
     expect(successEvents.length).toBe(1);

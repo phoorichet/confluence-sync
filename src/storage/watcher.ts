@@ -19,6 +19,7 @@ export class FileWatcher extends EventEmitter {
   private retryCount = 0;
   private isActive = false;
   private isSyncing = false;
+  private lastSyncFiles: string[] = [];
 
   constructor(
     config: WatchConfig,
@@ -147,6 +148,9 @@ export class FileWatcher extends EventEmitter {
       const changedFiles = Array.from(this.pendingChanges);
       this.pendingChanges.clear();
 
+      // Store files for potential retry
+      this.lastSyncFiles = changedFiles;
+
       logger.debug(`Syncing ${changedFiles.length} changed files`);
 
       // Perform sync operation
@@ -157,6 +161,7 @@ export class FileWatcher extends EventEmitter {
       });
 
       this.retryCount = 0;
+      this.lastSyncFiles = [];
       this.emit('sync:complete', result);
       logger.debug('Sync completed successfully');
     }
@@ -212,6 +217,8 @@ export class FileWatcher extends EventEmitter {
 
     setTimeout(() => {
       this.isSyncing = false;
+      // Re-add the files that failed to sync for retry
+      this.lastSyncFiles.forEach(file => this.pendingChanges.add(file));
       this.performSync();
     }, delay);
   }

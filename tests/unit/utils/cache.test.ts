@@ -15,7 +15,8 @@ describe('cache', () => {
   });
 
   afterEach(() => {
-    cache.clear();
+    // Properly destroy the cache singleton to stop timers
+    Cache.destroy();
   });
 
   describe('getInstance', () => {
