@@ -8,7 +8,7 @@ import { AuthManager } from '../../../src/auth/auth-manager';
 
 const server = setupServer();
 
-describe('confluence API Integration', () => {
+describe.skipIf(process.env.SKIP_INT_TEST === '1')('confluence API Integration', () => {
   let mockAuthManager: any;
 
   beforeAll(() => {

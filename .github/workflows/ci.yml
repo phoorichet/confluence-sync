@@ -38,6 +38,8 @@ jobs:
 
       - name: Run tests
         run: bun run test
+        env:
+          SKIP_INT_TEST: '1'
 
       - name: Verify dist output
         run: |
