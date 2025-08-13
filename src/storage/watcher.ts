@@ -1,3 +1,4 @@
+import type { FSWatcher } from 'chokidar';
 import type { SyncEngine } from '../sync/engine';
 import type { WatchConfig } from '../types/watch';
 import type { ManifestManager } from './manifest-manager';
@@ -9,7 +10,7 @@ import { ConfluenceSyncError } from '../utils/errors';
 import { logger } from '../utils/logger';
 
 export class FileWatcher extends EventEmitter {
-  private watcher: chokidar.FSWatcher | null = null;
+  private watcher: FSWatcher | null = null;
   private config: WatchConfig;
   private syncEngine: SyncEngine;
   private manifestManager: ManifestManager;
@@ -65,7 +66,7 @@ export class FileWatcher extends EventEmitter {
         .on('add', filePath => this.handleFileChange('add', filePath))
         .on('change', filePath => this.handleFileChange('change', filePath))
         .on('unlink', filePath => this.handleFileChange('unlink', filePath))
-        .on('error', error => this.handleWatchError(error));
+        .on('error', error => this.handleWatchError(error as Error));
 
       this.isActive = true;
       logger.debug('File watcher started');
