@@ -57,7 +57,7 @@ describe('profileManager Integration', () => {
     try {
       await fs.promises.rm(testDir, { recursive: true, force: true });
     }
-    catch (error) {
+    catch {
       // Ignore cleanup errors
     }
   });

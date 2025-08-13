@@ -24,20 +24,7 @@ describe('pull Command Integration', () => {
     server.listen({ onUnhandledRequest: 'error' });
   });
 
-  afterAll(() => {
-    // Close server after all tests
-    server.close();
-  });
-
   beforeEach(async () => {
-    // Reset circuit breaker and rate limiter state before each test
-    if ((apiClient as any).circuitBreaker) {
-      (apiClient as any).circuitBreaker.reset();
-    }
-    if ((apiClient as any).rateLimiter) {
-      (apiClient as any).rateLimiter.reset();
-    }
-
     // Setup temp directory
     tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'confluence-sync-test-'));
     // Don't use process.chdir as it affects all parallel tests
@@ -101,6 +88,11 @@ describe('pull Command Integration', () => {
 
     vi.clearAllMocks();
     vi.restoreAllMocks();
+  });
+
+  afterAll(() => {
+    // Close server after all tests
+    server.close();
   });
 
   it('should pull a simple page successfully', async () => {

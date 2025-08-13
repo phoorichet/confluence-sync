@@ -139,12 +139,12 @@ This is the page content.`;
       expect(result).toContain('spaceKey: NEWPROJ');
       expect(result).toContain('title: New Title');
       expect(result).toContain('version: 2');
-      
+
       // Should NOT contain old metadata
       expect(result).not.toContain('OLD123');
       expect(result).not.toContain('OLDPROJ');
       expect(result).not.toContain('Old Title');
-      
+
       // Should preserve actual content
       expect(result).toContain('# Actual Content');
       expect(result).toContain('This is the page content.');

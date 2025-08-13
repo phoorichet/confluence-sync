@@ -1,3 +1,4 @@
+import { exit } from 'node:process';
 import { Command } from 'commander';
 import { ConfigManager } from '../config/config-manager.ts';
 import { CONFIG_ERROR_CODES } from '../config/schemas.ts';
@@ -38,7 +39,7 @@ export const useCommand = new Command('use')
         profiles.forEach((profile) => {
           logger.info(`  - ${profile}`);
         });
-        process.exit(1);
+        exit(1);
       }
 
       // Switch to the requested profile
@@ -68,6 +69,6 @@ export const useCommand = new Command('use')
       else {
         logger.error('An unexpected error occurred');
       }
-      process.exit(1);
+      exit(1);
     }
   });

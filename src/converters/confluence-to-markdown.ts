@@ -82,7 +82,7 @@ export class ConfluenceToMarkdownConverter {
       if (content.startsWith('---')) {
         const lines = content.split('\n');
         let endIndex = -1;
-        
+
         // Find the closing delimiter
         for (let i = 1; i < lines.length; i++) {
           if (lines[i] === '---') {
@@ -90,7 +90,7 @@ export class ConfluenceToMarkdownConverter {
             break;
           }
         }
-        
+
         // If frontmatter found, remove it
         if (endIndex > 0) {
           const contentLines = lines.slice(endIndex + 1);
