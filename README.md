@@ -441,6 +441,39 @@ The codebase includes:
 - Product requirements in `docs/prd/`
 - Development guidance in `CLAUDE.md` for AI-assisted coding
 
+### CI/CD Pipelines
+
+This project uses GitHub Actions for continuous integration and deployment:
+
+#### Continuous Integration (CI)
+- **Branch**: `develop` (default branch)
+- **Triggers**: Push and pull requests to `develop`
+- **Actions**: Install dependencies, lint, build, and test
+- **Purpose**: Ensure code quality and test coverage
+
+#### Continuous Deployment (CD)
+- **Branch**: `main` (release branch)
+- **Triggers**: Push/merge to `main`
+- **Actions**: CI steps + publish to npm registry
+- **Purpose**: Automated releases to npmjs.com
+
+#### Setting up GitHub Secrets
+
+For the CD pipeline to publish to npm, you need to:
+
+1. Generate an npm access token:
+   - Go to https://www.npmjs.com/settings/YOUR_USERNAME/tokens
+   - Click "Generate New Token" → "Classic Token"
+   - Select "Automation" type
+   - Copy the generated token
+
+2. Add the token to GitHub repository secrets:
+   - Go to your repository's Settings → Secrets and variables → Actions
+   - Click "New repository secret"
+   - Name: `NPM_TOKEN`
+   - Value: Paste your npm token
+   - Click "Add secret"
+
 ### Running Tests
 
 ```bash
