@@ -11,7 +11,7 @@ import { ConflictResolver } from '../../../src/sync/conflict-resolver';
 import { SyncEngine } from '../../../src/sync/engine';
 import { logger } from '../../../src/utils/logger';
 
-describe('SyncEngine', () => {
+describe('syncEngine', () => {
   let syncEngine: SyncEngine;
   let manifestManager: ManifestManager;
   let fileManager: FileManager;
@@ -211,7 +211,7 @@ describe('SyncEngine', () => {
       expect(result.pushed).toContain('page1.md');
       expect(result.operation.status).toBe('completed');
       expect(convertSpy).toHaveBeenCalledWith('# Test Content');
-      expect(apiClient.updatePage).toHaveBeenCalledWith('page1', '<p>Test Content</p>', 2);
+      expect(apiClient.updatePage).toHaveBeenCalledWith('page1', '<p>Test Content</p>', 2, 'Page 1');
     });
 
     it('should process remote changes for pull', async () => {

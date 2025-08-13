@@ -5,7 +5,7 @@ import { FileManager } from '../../../src/storage/file-manager';
 import { ManifestManager } from '../../../src/storage/manifest-manager';
 import { ConflictResolver } from '../../../src/sync/conflict-resolver';
 
-describe('ConflictResolver', () => {
+describe('conflictResolver', () => {
   let conflictResolver: ConflictResolver;
   let manifestManager: ManifestManager;
   let fileManager: FileManager;

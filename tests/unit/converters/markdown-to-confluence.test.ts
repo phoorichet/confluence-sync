@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { MarkdownToConfluenceConverter } from '../../../src/converters/markdown-to-confluence';
 
-describe('MarkdownToConfluenceConverter', () => {
+describe('markdownToConfluenceConverter', () => {
   let converter: MarkdownToConfluenceConverter;
 
   beforeEach(() => {

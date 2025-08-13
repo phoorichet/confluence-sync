@@ -7,7 +7,15 @@ import { MarkdownToConfluenceConverter } from '../../../src/converters/markdown-
 import { FileManager } from '../../../src/storage/file-manager';
 import { ManifestManager } from '../../../src/storage/manifest-manager';
 
-describe('Push Command', () => {
+// Mock node:fs module before imports
+vi.mock('node:fs', () => ({
+  existsSync: vi.fn(),
+  statSync: vi.fn(),
+  readFileSync: vi.fn(),
+  writeFileSync: vi.fn(),
+}));
+
+describe('push Command', () => {
   let manifestSpy: Mock<any>;
   let apiClientSpy: Mock<any>;
   let consoleLogSpy: Mock<any>;
@@ -65,8 +73,11 @@ describe('Push Command', () => {
     });
 
     // Mock file system
-    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-    vi.spyOn(fs, 'statSync').mockReturnValue({ isFile: () => true } as any);
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.statSync).mockReturnValue({
+      isFile: () => true,
+      isDirectory: () => false,
+    } as any);
 
     // Mock FileManager
     vi.spyOn(FileManager.prototype, 'readFile').mockResolvedValue('# Test Content\n\nThis is a test.');
@@ -91,21 +102,21 @@ describe('Push Command', () => {
   });
 
   it('should validate file exists', async () => {
-    vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+    vi.mocked(fs.existsSync).mockReturnValue(false);
 
     try {
-      await pushCommand.parseAsync(['node', 'push', 'nonexistent.md']);
+      await pushCommand.parseAsync(['nonexistent.md'], { from: 'user' });
     }
     catch (e: any) {
       expect(e.message).toBe('Process exit');
     }
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('CS-404: File not found'));
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('CS-404: Path not found'));
   });
 
   it('should validate file is a markdown file', async () => {
     try {
-      await pushCommand.parseAsync(['node', 'push', 'test.txt']);
+      await pushCommand.parseAsync(['test.txt'], { from: 'user' });
     }
     catch (e: any) {
       expect(e.message).toBe('Process exit');
@@ -122,7 +133,7 @@ describe('Push Command', () => {
     });
 
     try {
-      await pushCommand.parseAsync(['node', 'push', 'untracked.md']);
+      await pushCommand.parseAsync(['untracked.md'], { from: 'user' });
     }
     catch (e: any) {
       expect(e.message).toBe('Process exit');
@@ -144,7 +155,7 @@ describe('Push Command', () => {
       ]),
     });
 
-    await pushCommand.parseAsync(['node', 'push', 'test.md']);
+    await pushCommand.parseAsync(['test.md'], { from: 'user' });
 
     expect(consoleLogSpy).toHaveBeenCalledWith(
       expect.stringContaining('No changes to push - file is already in sync'),
@@ -158,7 +169,7 @@ describe('Push Command', () => {
     });
 
     try {
-      await pushCommand.parseAsync(['node', 'push', 'test.md']);
+      await pushCommand.parseAsync(['test.md'], { from: 'user' });
     }
     catch (e: any) {
       expect(e.message).toBe('Process exit');
@@ -169,7 +180,7 @@ describe('Push Command', () => {
   });
 
   it('should support dry-run mode', async () => {
-    await pushCommand.parseAsync(['node', 'push', 'test.md', '--dry-run']);
+    await pushCommand.parseAsync(['test.md', '--dry-run'], { from: 'user' });
 
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('DRY RUN MODE'));
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.any(String), '123');
@@ -178,7 +189,7 @@ describe('Push Command', () => {
   });
 
   it('should successfully push changes', async () => {
-    await pushCommand.parseAsync(['node', 'push', 'test.md']);
+    await pushCommand.parseAsync(['test.md'], { from: 'user' });
 
     expect(apiClient.updatePage).toHaveBeenCalledWith(
       '123',
@@ -191,7 +202,7 @@ describe('Push Command', () => {
   });
 
   it('should display the Confluence URL after successful push', async () => {
-    await pushCommand.parseAsync(['node', 'push', 'test.md']);
+    await pushCommand.parseAsync(['test.md'], { from: 'user' });
 
     expect(consoleLogSpy).toHaveBeenCalledWith(
       expect.stringContaining('https://example.atlassian.net/wiki/spaces/TEST/pages/123'),
@@ -202,7 +213,7 @@ describe('Push Command', () => {
     vi.spyOn(apiClient, 'updatePage').mockRejectedValue(new Error('Network error'));
 
     try {
-      await pushCommand.parseAsync(['node', 'push', 'test.md']);
+      await pushCommand.parseAsync(['test.md'], { from: 'user' });
     }
     catch (e: any) {
       expect(e.message).toBe('Process exit');
@@ -215,7 +226,7 @@ describe('Push Command', () => {
     const converterSpy = vi.spyOn(MarkdownToConfluenceConverter.prototype, 'convert');
     converterSpy.mockResolvedValue('<h1>Converted</h1>');
 
-    await pushCommand.parseAsync(['node', 'push', 'test.md']);
+    await pushCommand.parseAsync(['test.md'], { from: 'user' });
 
     expect(converterSpy).toHaveBeenCalledWith('# Test Content\n\nThis is a test.');
     expect(apiClient.updatePage).toHaveBeenCalledWith(
@@ -229,7 +240,7 @@ describe('Push Command', () => {
   });
 
   it('should show diff summary in dry-run mode', async () => {
-    await pushCommand.parseAsync(['node', 'push', 'test.md', '--dry-run']);
+    await pushCommand.parseAsync(['test.md', '--dry-run'], { from: 'user' });
 
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Changes:'));
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringMatching(/\+.*lines added/));
@@ -237,7 +248,7 @@ describe('Push Command', () => {
   });
 
   it('should show content preview in dry-run mode', async () => {
-    await pushCommand.parseAsync(['node', 'push', 'test.md', '--dry-run']);
+    await pushCommand.parseAsync(['test.md', '--dry-run'], { from: 'user' });
 
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Content Preview'));
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('<h1>Test Content</h1>'));

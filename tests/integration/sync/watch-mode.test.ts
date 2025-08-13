@@ -1,5 +1,5 @@
 import type { ConfigManager } from '../../../src/config/config-manager';
-import type { ManifestManager } from '../../../src/storage/manifest-manager';
+import type { ManifestManager, SyncManifest } from '../../../src/storage/manifest-manager';
 import type { SyncEngine } from '../../../src/sync/engine';
 import type { WatchConfig } from '../../../src/types/watch';
 import * as fs from 'node:fs/promises';
@@ -13,65 +13,96 @@ describe('watch Mode Integration', () => {
   let syncEngine: SyncEngine;
   let manifestManager: ManifestManager;
   let _configManager: ConfigManager;
+  let originalCwd: string;
 
   beforeEach(async () => {
+    // Save original working directory
+    originalCwd = process.cwd();
+    
     // Create temp directory
-    tempDir = path.join(process.cwd(), `temp-test-${Date.now()}`);
+    tempDir = path.join(originalCwd, `temp-test-${Date.now()}`);
     await fs.mkdir(tempDir, { recursive: true });
+    
+    // Change to temp directory for the test
+    process.chdir(tempDir);
 
     // Create mock manifest
-    const manifest = {
-      version: '1.0.0',
+    const manifest: SyncManifest = {
+      version: '2.0.0',
       confluenceUrl: 'https://test.atlassian.net',
-      lastSyncTime: new Date().toISOString(),
+      lastSyncTime: new Date(),
       syncMode: 'watch',
-      pages: [
-        {
-          id: 'page1',
-          spaceKey: 'TEST',
-          title: 'Test Page 1',
-          localPath: 'test1.md',
-          contentHash: 'hash1',
-          status: 'synced',
-        },
-        {
-          id: 'page2',
-          spaceKey: 'TEST',
-          title: 'Test Page 2',
-          localPath: 'docs/test2.md',
-          contentHash: 'hash2',
-          status: 'synced',
-        },
-      ],
-      config: {
-        syncDirectory: tempDir,
-        conflictStrategy: 'manual',
-      },
+      pages: new Map([
+        [
+          'page1',
+          {
+            id: 'page1',
+            spaceKey: 'TEST',
+            title: 'Test Page 1',
+            version: 1,
+            parentId: null,
+            lastModified: new Date(),
+            localPath: 'test1.md',
+            contentHash: 'hash1',
+            status: 'synced',
+          },
+        ],
+        [
+          'page2',
+          {
+            id: 'page2',
+            spaceKey: 'TEST',
+            title: 'Test Page 2',
+            version: 1,
+            parentId: null,
+            lastModified: new Date(),
+            localPath: 'docs/test2.md',
+            contentHash: 'hash2',
+            status: 'synced',
+          },
+        ],
+      ]),
     };
 
-    // Write manifest file
+    // Convert Map to JSON-serializable format
+    const manifestJson = {
+      ...manifest,
+      pages: Object.fromEntries(
+        Array.from(manifest.pages.entries()).map(([key, page]) => [
+          key,
+          {
+            ...page,
+            lastModified: page.lastModified.toISOString(),
+          },
+        ]),
+      ),
+      lastSyncTime: manifest.lastSyncTime.toISOString(),
+    };
+
+    // Write manifest file (using correct filename)
     await fs.writeFile(
-      path.join(tempDir, '.confluence-sync.json'),
-      JSON.stringify(manifest, null, 2),
+      '.csmanifest.json',
+      JSON.stringify(manifestJson, null, 2),
     );
 
     // Create test files
-    await fs.writeFile(path.join(tempDir, 'test1.md'), '# Test 1');
-    await fs.mkdir(path.join(tempDir, 'docs'), { recursive: true });
-    await fs.writeFile(path.join(tempDir, 'docs/test2.md'), '# Test 2');
+    await fs.writeFile('test1.md', '# Test 1');
+    await fs.mkdir('docs', { recursive: true });
+    await fs.writeFile('docs/test2.md', '# Test 2');
 
     // Initialize components with mocks
     manifestManager = {
-      load: vi.fn().mockResolvedValue(undefined),
+      load: vi.fn().mockResolvedValue(manifest),
       getManifest: vi.fn().mockResolvedValue(manifest),
-      getConfig: vi.fn().mockResolvedValue({ syncDirectory: tempDir }),
+      getConfig: vi.fn().mockResolvedValue({ syncDirectory: '.' }),
       updatePageStatus: vi.fn().mockResolvedValue(undefined),
+      save: vi.fn().mockResolvedValue(undefined),
     } as any;
 
     _configManager = {
       loadConfig: vi.fn().mockResolvedValue({
         confluenceUrl: 'https://test.atlassian.net',
-        syncDirectory: tempDir,
+        syncDirectory: '.',
       }),
     } as any;
 
@@ -90,6 +121,9 @@ describe('watch Mode Integration', () => {
       await watcher.stop();
       watcher = null;
     }
+
+    // Restore original working directory
+    process.chdir(originalCwd);
 
     // Clean up temp directory
     try {
@@ -126,12 +160,15 @@ describe('watch Mode Integration', () => {
     });
 
     await watcher.start();
+    
+    // Wait for watcher to initialize
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // Modify a file
-    await fs.writeFile(path.join(tempDir, 'test1.md'), '# Test 1 Modified');
+    await fs.writeFile('test1.md', '# Test 1 Modified');
 
-    // Wait for debounce and sync
-    await new Promise(resolve => setTimeout(resolve, 200));
+    // Wait for file stability (500ms) + debounce (100ms) + processing
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     expect(changeEvents.length).toBeGreaterThan(0);
     expect(syncEngine.sync).toHaveBeenCalled();
@@ -151,14 +188,17 @@ describe('watch Mode Integration', () => {
     watcher = new FileWatcher(config, syncEngine, manifestManager);
 
     await watcher.start();
+    
+    // Wait for watcher to initialize
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // Make multiple rapid changes
-    await fs.writeFile(path.join(tempDir, 'test1.md'), '# Modified 1');
-    await fs.writeFile(path.join(tempDir, 'docs/test2.md'), '# Modified 2');
-    await fs.writeFile(path.join(tempDir, 'test3.md'), '# New file');
+    await fs.writeFile('test1.md', '# Modified 1');
+    await fs.writeFile('docs/test2.md', '# Modified 2');
+    await fs.writeFile('test3.md', '# New file');
 
-    // Wait for debounce
-    await new Promise(resolve => setTimeout(resolve, 300));
+    // Wait for file stability (500ms) + debounce (200ms) + processing
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Should batch all changes into one sync
     expect(syncEngine.sync).toHaveBeenCalledTimes(1);
@@ -182,17 +222,20 @@ describe('watch Mode Integration', () => {
     });
 
     await watcher.start();
+    
+    // Wait for watcher to initialize
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // Create files that should be ignored
-    await fs.writeFile(path.join(tempDir, 'test.tmp'), 'temporary');
-    await fs.mkdir(path.join(tempDir, 'node_modules'), { recursive: true });
-    await fs.writeFile(path.join(tempDir, 'node_modules/test.js'), 'module');
+    await fs.writeFile('test.tmp', 'temporary');
+    await fs.mkdir('node_modules', { recursive: true });
+    await fs.writeFile('node_modules/test.js', 'module');
 
     // Create file that should trigger
-    await fs.writeFile(path.join(tempDir, 'valid.md'), '# Valid');
+    await fs.writeFile('valid.md', '# Valid');
 
-    // Wait for potential changes
-    await new Promise(resolve => setTimeout(resolve, 200));
+    // Wait for file stability (500ms) + debounce (100ms) + processing
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Should only detect valid.md
     const validChanges = changeEvents.filter(f => !f.includes('.tmp') && !f.includes('node_modules'));
@@ -232,12 +275,15 @@ describe('watch Mode Integration', () => {
     });
 
     await watcher.start();
+    
+    // Wait for watcher to initialize
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // Trigger a change
-    await fs.writeFile(path.join(tempDir, 'test1.md'), '# Modified');
+    await fs.writeFile('test1.md', '# Modified');
 
-    // Wait for retry and success
-    await new Promise(resolve => setTimeout(resolve, 300));
+    // Wait for file stability (500ms) + debounce (100ms) + retry delays
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     expect(retryEvents).toContain(1);
     expect(successEvents.length).toBe(1);
@@ -256,15 +302,18 @@ describe('watch Mode Integration', () => {
 
     watcher = new FileWatcher(config, syncEngine, manifestManager);
     await watcher.start();
+    
+    // Wait for watcher to initialize
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // Make a change
-    await fs.writeFile(path.join(tempDir, 'test1.md'), '# Modified');
+    await fs.writeFile('test1.md', '# Modified');
 
     // Stop immediately
     await watcher.stop();
 
     // Wait to ensure no sync happens after stop
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 300));
 
     // Sync might have been called once if it started before stop
     expect((syncEngine.sync as any).mock.calls.length).toBeLessThanOrEqual(1);

@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ManifestManager } from '../../../src/storage/manifest-manager';
 
-describe('Manifest Migration', () => {
+describe('manifest Migration', () => {
   let manifestManager: ManifestManager;
   const testManifestPath = path.resolve('.csmanifest.json');
 
@@ -227,7 +227,7 @@ describe('Manifest Migration', () => {
     });
   });
 
-  describe('New manifest methods', () => {
+  describe('new manifest methods', () => {
     beforeEach(async () => {
       // Create a v2 manifest with test data
       const testManifest = {

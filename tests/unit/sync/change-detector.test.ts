@@ -6,7 +6,12 @@ import { apiClient } from '../../../src/api/client';
 import { ChangeDetector } from '../../../src/sync/change-detector';
 import * as hashUtils from '../../../src/utils/hash';
 
-describe('ChangeDetector', () => {
+// Mock node:fs module
+vi.mock('node:fs', () => ({
+  existsSync: vi.fn(),
+}));
+
+describe('changeDetector', () => {
   let changeDetector: ChangeDetector;
   let apiClientSpy: Mock<any>;
   let existsSyncSpy: Mock<any>;
@@ -25,6 +30,7 @@ describe('ChangeDetector', () => {
   };
 
   beforeEach(() => {
+    vi.clearAllMocks();
     changeDetector = ChangeDetector.getInstance();
 
     // Mock API client
@@ -36,16 +42,15 @@ describe('ChangeDetector', () => {
     });
 
     // Mock file system
-    existsSyncSpy = vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+    existsSyncSpy = vi.mocked(fs.existsSync);
+    existsSyncSpy.mockReturnValue(true);
 
     // Mock hash utilities
     calculateFileHashSpy = vi.spyOn(hashUtils, 'calculateFileHash').mockReturnValue('abc123');
   });
 
   afterEach(() => {
-    apiClientSpy.mockRestore();
-    existsSyncSpy.mockRestore();
-    calculateFileHashSpy.mockRestore();
+    vi.restoreAllMocks();
   });
 
   describe('detectLocalChanges', () => {

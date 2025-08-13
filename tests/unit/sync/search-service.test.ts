@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiClient } from '../../../src/api/client';
 import { SearchService } from '../../../src/sync/search-service';
 import { Cache } from '../../../src/utils/cache';
 
-// Mock ApiClient and Cache
+// Mock ApiClient and Cache before importing them
 vi.mock('../../../src/api/client', () => ({
   ApiClient: {
     getInstance: vi.fn(),
@@ -23,8 +23,11 @@ describe('searchService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Clear singleton instance
+    (SearchService as any).instance = undefined;
 
     mockApiClient = {
+      initialize: vi.fn().mockResolvedValue(undefined),
       searchContent: vi.fn().mockResolvedValue({
         results: [
           {
@@ -50,6 +53,11 @@ describe('searchService', () => {
     (Cache.getInstance as any).mockReturnValue(mockCache);
 
     searchService = SearchService.getInstance();
+  });
+
+  afterEach(() => {
+    // Clean up singleton instance
+    (SearchService as any).instance = undefined;
   });
 
   describe('search', () => {

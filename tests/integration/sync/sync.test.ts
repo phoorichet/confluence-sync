@@ -1,25 +1,37 @@
 import type { Page } from '../../../src/storage/manifest-manager';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../../../src/api/client';
+import { ConfluenceToMarkdownConverter } from '../../../src/converters/confluence-to-markdown';
+import { MarkdownToConfluenceConverter } from '../../../src/converters/markdown-to-confluence';
+import { FileManager } from '../../../src/storage/file-manager';
 import { ManifestManager } from '../../../src/storage/manifest-manager';
+import { ChangeDetector } from '../../../src/sync/change-detector';
 import { SyncEngine } from '../../../src/sync/engine';
 import { logger } from '../../../src/utils/logger';
 
-describe('Sync Integration Tests', () => {
+describe('sync Integration Tests', () => {
   const testDir = path.join(__dirname, 'test-workspace');
   const _manifestPath = path.join(testDir, '.confluence-sync.json');
   let syncEngine: SyncEngine;
   let manifestManager: ManifestManager;
+  let originalCwd: string;
 
   beforeEach(() => {
-    // Clear singletons
+    // Save original working directory
+    originalCwd = process.cwd();
+    // Clear all singletons
     SyncEngine.clearInstance();
     ManifestManager.clearInstance();
+    FileManager.clearInstance();
+    ChangeDetector.clearInstance();
 
     // Create test directory
     mkdirSync(testDir, { recursive: true });
+    
+    // Change to test directory
+    process.chdir(testDir);
 
     // Get instances
     syncEngine = SyncEngine.getInstance();
@@ -35,15 +47,23 @@ describe('Sync Integration Tests', () => {
   });
 
   afterEach(() => {
+    // Restore original working directory
+    process.chdir(originalCwd);
+    
     // Clean up test directory
     rmSync(testDir, { recursive: true, force: true });
 
-    // Clear singletons
+    // Clear all singletons
     SyncEngine.clearInstance();
     ManifestManager.clearInstance();
+    FileManager.clearInstance();
+    ChangeDetector.clearInstance();
+    
+    // Restore all mocks
+    vi.restoreAllMocks();
   });
 
-  describe('Bi-directional sync workflow', () => {
+  describe('bi-directional sync workflow', () => {
     it('should sync local and remote changes in a single operation', async () => {
       // Setup test files
       const localFile1 = path.join(testDir, 'local-changed.md');
@@ -53,6 +73,15 @@ describe('Sync Integration Tests', () => {
       writeFileSync(localFile1, '# Local Changed Content');
       writeFileSync(localFile2, '# Original Content');
       writeFileSync(localFile3, '# Unchanged Content');
+      
+      // Mock FileManager
+      const fileManager = FileManager.getInstance();
+      vi.spyOn(fileManager, 'readFile').mockImplementation((filePath: string) => {
+        // Check if it's already an absolute path
+        const fullPath = path.isAbsolute(filePath) ? filePath : path.join(testDir, filePath);
+        return Promise.resolve(readFileSync(fullPath, 'utf-8'));
+      });
+      vi.spyOn(fileManager, 'writeFile').mockResolvedValue(path.join(testDir, 'test.md'));
 
       // Setup manifest with test pages
       const testManifest = {
@@ -100,6 +129,19 @@ describe('Sync Integration Tests', () => {
       // Mock manifest operations
       vi.spyOn(manifestManager, 'load').mockResolvedValue(testManifest);
       vi.spyOn(manifestManager, 'updatePage').mockResolvedValue();
+      vi.spyOn(manifestManager, 'save').mockResolvedValue();
+      
+      // Mock ChangeDetector
+      const changeDetector = ChangeDetector.getInstance();
+      vi.spyOn(changeDetector, 'getChangeState').mockImplementation(async (page: Page) => {
+        if (page.id === 'page1') {
+          return 'local-only'; // Local changes
+        } else if (page.id === 'page2') {
+          return 'remote-only'; // Remote changes
+        } else {
+          return 'unchanged'; // No changes
+        }
+      });
 
       // Mock API responses
       vi.spyOn(apiClient, 'getPage')
@@ -124,6 +166,10 @@ describe('Sync Integration Tests', () => {
         id: 'page1',
         version: { number: 2 },
       } as any);
+      
+      // Mock converters
+      vi.spyOn(MarkdownToConfluenceConverter.prototype, 'convert').mockResolvedValue('<p>Converted HTML</p>');
+      vi.spyOn(ConfluenceToMarkdownConverter.prototype, 'convert').mockResolvedValue('# Converted Markdown');
 
       // Execute sync
       const result = await syncEngine.sync({
@@ -133,6 +179,9 @@ describe('Sync Integration Tests', () => {
       });
 
       // Verify results
+      if (result.errors.length > 0) {
+        console.log('Sync errors:', result.errors);
+      }
       expect(result.operation.status).toBe('completed');
       expect(result.pushed.length).toBeGreaterThan(0);
       expect(result.pulled.length).toBeGreaterThan(0);
@@ -143,6 +192,13 @@ describe('Sync Integration Tests', () => {
       // Setup conflicted file
       const conflictFile = path.join(testDir, 'conflict.md');
       writeFileSync(conflictFile, '# Local Changed Content');
+      
+      // Mock FileManager
+      const fileManager = FileManager.getInstance();
+      vi.spyOn(fileManager, 'readFile').mockImplementation((filePath: string) => {
+        const fullPath = path.isAbsolute(filePath) ? filePath : path.join(testDir, filePath);
+        return Promise.resolve(readFileSync(fullPath, 'utf-8'));
+      });
 
       const testManifest = {
         version: '2.0.0',
@@ -165,6 +221,11 @@ describe('Sync Integration Tests', () => {
       };
 
       vi.spyOn(manifestManager, 'load').mockResolvedValue(testManifest);
+      vi.spyOn(manifestManager, 'save').mockResolvedValue();
+      
+      // Mock ChangeDetector to return conflict
+      const changeDetector = ChangeDetector.getInstance();
+      vi.spyOn(changeDetector, 'getChangeState').mockResolvedValue('both-changed');
 
       // Mock both local and remote changes
       vi.spyOn(apiClient, 'getPage').mockResolvedValue({
@@ -188,6 +249,13 @@ describe('Sync Integration Tests', () => {
     it('should respect dry-run mode and not make changes', async () => {
       const testFile = path.join(testDir, 'test.md');
       writeFileSync(testFile, '# Test Content');
+      
+      // Mock FileManager
+      const fileManager = FileManager.getInstance();
+      vi.spyOn(fileManager, 'readFile').mockImplementation((filePath: string) => {
+        const fullPath = path.isAbsolute(filePath) ? filePath : path.join(testDir, filePath);
+        return Promise.resolve(readFileSync(fullPath, 'utf-8'));
+      });
 
       const testManifest = {
         version: '2.0.0',
@@ -210,6 +278,15 @@ describe('Sync Integration Tests', () => {
       };
 
       vi.spyOn(manifestManager, 'load').mockResolvedValue(testManifest);
+      vi.spyOn(manifestManager, 'save').mockResolvedValue();
+      
+      // Mock ChangeDetector to return local changes
+      const changeDetector = ChangeDetector.getInstance();
+      vi.spyOn(changeDetector, 'getChangeState').mockResolvedValue('local-only');
+      
+      // Mock converters
+      vi.spyOn(MarkdownToConfluenceConverter.prototype, 'convert').mockResolvedValue('<p>Converted HTML</p>');
+      
       const updateSpy = vi.spyOn(apiClient, 'updatePage');
       const manifestUpdateSpy = vi.spyOn(manifestManager, 'updatePage');
 
@@ -229,6 +306,13 @@ describe('Sync Integration Tests', () => {
     it('should handle errors gracefully', async () => {
       const testFile = path.join(testDir, 'error.md');
       writeFileSync(testFile, '# Error Test');
+      
+      // Mock FileManager
+      const fileManager = FileManager.getInstance();
+      vi.spyOn(fileManager, 'readFile').mockImplementation((filePath: string) => {
+        const fullPath = path.isAbsolute(filePath) ? filePath : path.join(testDir, filePath);
+        return Promise.resolve(readFileSync(fullPath, 'utf-8'));
+      });
 
       const testManifest = {
         version: '2.0.0',
@@ -251,6 +335,14 @@ describe('Sync Integration Tests', () => {
       };
 
       vi.spyOn(manifestManager, 'load').mockResolvedValue(testManifest);
+      vi.spyOn(manifestManager, 'save').mockResolvedValue();
+      
+      // Mock ChangeDetector to return local changes
+      const changeDetector = ChangeDetector.getInstance();
+      vi.spyOn(changeDetector, 'getChangeState').mockResolvedValue('local-only');
+      
+      // Mock converters
+      vi.spyOn(MarkdownToConfluenceConverter.prototype, 'convert').mockResolvedValue('<p>Converted HTML</p>');
 
       // Mock API error
       vi.spyOn(apiClient, 'updatePage').mockRejectedValue(new Error('API Error'));
@@ -274,6 +366,13 @@ describe('Sync Integration Tests', () => {
         writeFileSync(filePath, `# File ${i} Content`);
         files.push(filePath);
       }
+      
+      // Mock FileManager
+      const fileManager = FileManager.getInstance();
+      vi.spyOn(fileManager, 'readFile').mockImplementation((filePath: string) => {
+        const fullPath = path.isAbsolute(filePath) ? filePath : path.join(testDir, filePath);
+        return Promise.resolve(readFileSync(fullPath, 'utf-8'));
+      });
 
       // Create manifest with multiple pages
       const pages = new Map<string, Page>();
@@ -301,6 +400,14 @@ describe('Sync Integration Tests', () => {
 
       vi.spyOn(manifestManager, 'load').mockResolvedValue(testManifest);
       vi.spyOn(manifestManager, 'updatePage').mockResolvedValue();
+      vi.spyOn(manifestManager, 'save').mockResolvedValue();
+      
+      // Mock ChangeDetector to return local changes for all pages
+      const changeDetector = ChangeDetector.getInstance();
+      vi.spyOn(changeDetector, 'getChangeState').mockResolvedValue('local-only');
+      
+      // Mock converters
+      vi.spyOn(MarkdownToConfluenceConverter.prototype, 'convert').mockResolvedValue('<p>Converted HTML</p>');
 
       let concurrentCalls = 0;
       let maxConcurrent = 0;

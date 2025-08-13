@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FilterManager } from '../../../src/storage/filter-manager';
 import { ManifestManager } from '../../../src/storage/manifest-manager';
 
@@ -17,6 +17,9 @@ describe('filterManager', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    // Reset FilterManager singleton
+    (FilterManager as any).instance = undefined;
+
     mockManifest = {
       version: '2.0.0',
       confluenceUrl: 'https://test.atlassian.net',
@@ -34,6 +37,12 @@ describe('filterManager', () => {
     (ManifestManager.getInstance as any).mockReturnValue(mockManifestManager);
 
     filterManager = FilterManager.getInstance();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    // Reset FilterManager singleton
+    (FilterManager as any).instance = undefined;
   });
 
   describe('saveFilter', () => {

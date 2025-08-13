@@ -21,9 +21,9 @@ describe('debounce', () => {
     await new Promise(resolve => setTimeout(resolve, 25));
     debounced();
     await new Promise(resolve => setTimeout(resolve, 25));
-    
+
     expect(fn).not.toHaveBeenCalled();
-    
+
     await new Promise(resolve => setTimeout(resolve, 30));
     expect(fn).toHaveBeenCalledTimes(1);
   });
@@ -39,18 +39,21 @@ describe('debounce', () => {
   });
 
   it('should preserve this context', async () => {
+    const methodSpy = vi.fn(function (this: any) {
+      return this.value;
+    });
+
     const obj = {
       value: 42,
-      method: vi.fn(function(this: any) {
-        return this.value;
-      }),
+      method: methodSpy,
     };
 
     obj.method = debounce(obj.method, 50);
     obj.method();
-    
+
     await new Promise(resolve => setTimeout(resolve, 60));
-    expect(obj.method).toHaveBeenCalled();
+    expect(methodSpy).toHaveBeenCalled();
+    expect(methodSpy.mock.instances[0]).toBe(obj);
   });
 
   describe('cancel()', () => {
@@ -60,7 +63,7 @@ describe('debounce', () => {
 
       debounced();
       debounced.cancel();
-      
+
       await new Promise(resolve => setTimeout(resolve, 60));
       expect(fn).not.toHaveBeenCalled();
     });
@@ -97,7 +100,7 @@ describe('debounce', () => {
       const debounced = debounce(fn, 50);
 
       expect(debounced.pending()).toBe(false);
-      
+
       debounced();
       expect(debounced.pending()).toBe(true);
 
@@ -126,7 +129,7 @@ describe('debounceCollect', () => {
 
     debounced('item1');
     await new Promise(resolve => setTimeout(resolve, 60));
-    
+
     debounced('item2');
     await new Promise(resolve => setTimeout(resolve, 60));
 
@@ -163,7 +166,7 @@ describe('debounceCollect', () => {
     const debounced = debounceCollect(fn, 50);
 
     expect(debounced.pending()).toBe(false);
-    
+
     debounced('item');
     expect(debounced.pending()).toBe(true);
 

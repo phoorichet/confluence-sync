@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Command } from 'commander';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { syncCommand } from '../../../src/commands/sync';
 import { SyncEngine } from '../../../src/sync/engine';
 import { logger } from '../../../src/utils/logger';

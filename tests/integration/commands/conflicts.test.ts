@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Command } from 'commander';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { conflictsCommand } from '../../../src/commands/conflicts';
 import { BackupManager } from '../../../src/storage/backup-manager';
 import { FileManager } from '../../../src/storage/file-manager';
@@ -12,6 +12,9 @@ describe('conflictsCommand', () => {
   let exitSpy: any;
 
   beforeEach(() => {
+    // Clear all mocks before each test
+    vi.clearAllMocks();
+
     // Mock console and process
     consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
@@ -22,6 +25,10 @@ describe('conflictsCommand', () => {
     vi.spyOn(logger, 'error').mockImplementation(() => {});
     vi.spyOn(logger, 'warn').mockImplementation(() => {});
     vi.spyOn(logger, 'info').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('should list conflicted files', async () => {
@@ -54,7 +61,7 @@ describe('conflictsCommand', () => {
     program.addCommand(conflictsCommand);
 
     // Run the command
-    await program.parseAsync(['node', 'test', 'conflicts'], { from: 'user' });
+    await program.parseAsync(['conflicts'], { from: 'user' });
 
     // Check console output
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Found 2 conflicted file(s)'));
@@ -79,10 +86,10 @@ describe('conflictsCommand', () => {
     program.addCommand(conflictsCommand);
 
     // Run the command
-    await program.parseAsync(['node', 'test', 'conflicts'], { from: 'user' });
+    await program.parseAsync(['conflicts'], { from: 'user' });
 
-    // Should succeed with no conflicts message
-    expect(consoleSpy).not.toHaveBeenCalledWith(expect.stringContaining('Found'));
+    // Should not output the "Found X conflicted file(s)" message
+    expect(consoleSpy).not.toHaveBeenCalledWith(expect.stringContaining('conflicted file(s)'));
   });
 
   it('should handle errors gracefully', async () => {
@@ -103,7 +110,7 @@ describe('conflictsCommand', () => {
 
     // Run the command and expect it to fail
     try {
-      await program.parseAsync(['node', 'test', 'conflicts'], { from: 'user' });
+      await program.parseAsync(['conflicts'], { from: 'user' });
     }
     catch (error: any) {
       expect(error.message).toBe('Process exit');
@@ -137,7 +144,7 @@ describe('conflictsCommand', () => {
     program.addCommand(conflictsCommand);
 
     // Run with invalid strategy
-    await program.parseAsync(['node', 'test', 'conflicts', '--resolve-all', 'invalid'], { from: 'user' });
+    await program.parseAsync(['conflicts', '--resolve-all', 'invalid'], { from: 'user' });
 
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Invalid strategy'));
   });

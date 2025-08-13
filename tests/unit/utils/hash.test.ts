@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { calculateFileHash, calculateStringHash, getShortHash, hashesMatch } from '../../../src/utils/hash';
 
-describe('Hash Utilities', () => {
+describe('hash Utilities', () => {
   describe('calculateStringHash', () => {
     it('should calculate SHA-256 hash for a string', () => {
       const content = 'Hello, World!';

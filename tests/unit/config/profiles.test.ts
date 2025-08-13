@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CONFIG_ERROR_CODES } from '../../../src/config/schemas.ts';
 import { ProfileManager } from '../../../src/config/profiles.ts';
+import { CONFIG_ERROR_CODES } from '../../../src/config/schemas.ts';
 
 // Mock fs module
 vi.mock('node:fs', () => ({
@@ -15,7 +15,7 @@ vi.mock('node:fs', () => ({
 describe('profileManager', () => {
   let profileManager: ProfileManager;
   const mockConfigPath = '/test/path/.confluence-sync.json';
-  const mockProfilePath = '/test/path/.confluence-sync-profile';
+  const mockProfilePath = '/test/path/.csprofile';
 
   const mockConfig = {
     version: '1.0.0',
@@ -93,7 +93,16 @@ describe('profileManager', () => {
       (fs.promises.readFile as any).mockResolvedValue(JSON.stringify(mockConfig));
 
       const profile = await profileManager.getProfile('production');
-      expect(profile).toEqual(mockConfig.profiles.production);
+      expect(profile).toEqual({
+        ...mockConfig.profiles.production,
+        formatOptions: {
+          preserveTables: true,
+          preserveCodeBlocks: true,
+          preserveLinks: true,
+          preserveImages: true,
+          preserveMacros: false,
+        },
+      });
     });
 
     it('should throw error for non-existent profile', async () => {
@@ -303,7 +312,16 @@ describe('profileManager', () => {
 
       const profile = await profileManager.switchProfile('staging');
 
-      expect(profile).toEqual(mockConfig.profiles.staging);
+      expect(profile).toEqual({
+        ...mockConfig.profiles.staging,
+        formatOptions: {
+          preserveTables: true,
+          preserveCodeBlocks: true,
+          preserveLinks: true,
+          preserveImages: true,
+          preserveMacros: false,
+        },
+      });
       expect((fs.promises.writeFile as any)).toHaveBeenCalledWith(
         mockProfilePath,
         'staging',

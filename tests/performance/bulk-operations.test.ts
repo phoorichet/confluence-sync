@@ -6,7 +6,7 @@ import { apiClient, type PageSingle } from '../../src/api/client';
 import { FileManager } from '../../src/storage/file-manager';
 import { ManifestManager } from '../../src/storage/manifest-manager';
 
-describe('Performance Regression Tests', () => {
+describe('performance Regression Tests', () => {
   const testDir = path.join(__dirname, 'test-performance');
   const _manifestPath = path.join(testDir, '.confluence-sync.json');
 
@@ -261,7 +261,7 @@ describe('Performance Regression Tests', () => {
     });
   });
 
-  describe('Memory Efficiency', () => {
+  describe('memory Efficiency', () => {
     it('should handle 100MB of content without excessive memory usage', async () => {
       const fileManager = FileManager.getInstance();
 
@@ -294,7 +294,7 @@ describe('Performance Regression Tests', () => {
     });
   });
 
-  describe('Concurrent Operations', () => {
+  describe('concurrent Operations', () => {
     it('should handle 10 concurrent read operations efficiently', async () => {
       // Create test pages
       const pages: PageSingle[] = [];

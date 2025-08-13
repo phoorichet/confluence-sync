@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../../../src/api/client';
 import { ManifestManager } from '../../../src/storage/manifest-manager';
 
-describe('Hierarchy Push Integration', () => {
+describe('hierarchy Push Integration', () => {
   const testDir = path.join(__dirname, 'test-push-dir');
   const _manifestPath = path.join(testDir, '.confluence-sync.json');
 

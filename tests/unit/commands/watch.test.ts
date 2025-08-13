@@ -5,6 +5,29 @@ import { ManifestManager } from '../../../src/storage/manifest-manager';
 import { FileWatcher } from '../../../src/storage/watcher';
 import { SyncEngine } from '../../../src/sync/engine';
 
+// Mock modules before importing them
+vi.mock('../../../src/config/config-manager', () => ({
+  ConfigManager: {
+    getInstance: vi.fn(),
+  },
+}));
+
+vi.mock('../../../src/storage/manifest-manager', () => ({
+  ManifestManager: {
+    getInstance: vi.fn(),
+  },
+}));
+
+vi.mock('../../../src/storage/watcher', () => ({
+  FileWatcher: vi.fn(),
+}));
+
+vi.mock('../../../src/sync/engine', () => ({
+  SyncEngine: {
+    getInstance: vi.fn(),
+  },
+}));
+
 describe('watch Command', () => {
   let mockWatcher: any;
   let mockConfigManager: any;
@@ -23,7 +46,7 @@ describe('watch Command', () => {
     };
 
     mockConfigManager = {
-      loadConfig: vi.fn().mockResolvedValue({
+      getConfig: vi.fn().mockResolvedValue({
         syncDirectory: '/test/sync',
         confluenceUrl: 'https://test.atlassian.net',
       }),
@@ -46,9 +69,9 @@ describe('watch Command', () => {
 
     // Setup mock constructors
     (FileWatcher as any).mockImplementation(() => mockWatcher);
-    (ConfigManager as any).mockImplementation(() => mockConfigManager);
-    (ManifestManager as any).mockImplementation(() => mockManifestManager);
-    (SyncEngine as any).mockImplementation(() => mockSyncEngine);
+    (ConfigManager.getInstance as any).mockReturnValue(mockConfigManager);
+    (ManifestManager.getInstance as any).mockReturnValue(mockManifestManager);
+    (SyncEngine.getInstance as any).mockReturnValue(mockSyncEngine);
   });
 
   afterEach(() => {

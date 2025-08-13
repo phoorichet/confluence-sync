@@ -1,11 +1,12 @@
 import type { SyncManifest } from '../../../src/storage/manifest-manager';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-describe('Push Integration', () => {
+describe('push Integration', () => {
   let tempDir: string;
   let server: ReturnType<typeof setupServer>;
 
@@ -32,7 +33,7 @@ describe('Push Integration', () => {
 
   beforeEach(async () => {
     // Create temp directory
-    tempDir = await Bun.mkdtemp(path.join(Bun.tmpdir(), 'push-test-'));
+    tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'push-test-'));
     process.chdir(tempDir);
 
     // Set up MSW server
@@ -82,9 +83,10 @@ describe('Push Integration', () => {
 
     // Create manifest file
     const manifest: SyncManifest = {
-      version: '1.0.0',
+      version: '2.0.0',
       confluenceUrl: 'https://test.atlassian.net',
       lastSyncTime: new Date(),
+      syncMode: 'manual',
       pages: new Map([
         ['123', {
           id: '123',
@@ -106,10 +108,10 @@ describe('Push Integration', () => {
       pages: Object.fromEntries(manifest.pages),
     };
 
-    await Bun.write('.confluence-sync.json', JSON.stringify(manifestJson, null, 2));
+    await fs.promises.writeFile('.confluence-sync.json', JSON.stringify(manifestJson, null, 2));
 
     // Create test markdown file
-    await Bun.write('test-page.md', `# Updated Test Page
+    await fs.promises.writeFile('test-page.md', `# Updated Test Page
 
 This is the updated content.
 
@@ -156,7 +158,7 @@ console.log('Hello, World!');
     const { MarkdownToConfluenceConverter } = await import('../../../src/converters/markdown-to-confluence');
     const converter = new MarkdownToConfluenceConverter();
 
-    const markdown = await Bun.file('test-page.md').text();
+    const markdown = await fs.promises.readFile('test-page.md', 'utf-8');
     const converted = await converter.convert(markdown);
 
     // Verify conversion includes expected elements
@@ -197,17 +199,17 @@ console.log('Hello, World!');
     // - Output contains preview information
     // - Manifest file is unchanged
 
-    const originalManifest = await Bun.file('.confluence-sync.json').text();
+    const originalManifest = await fs.promises.readFile('.confluence-sync.json', 'utf-8');
 
     // After dry-run (simulated)
-    const afterManifest = await Bun.file('.confluence-sync.json').text();
+    const afterManifest = await fs.promises.readFile('.confluence-sync.json', 'utf-8');
 
     expect(originalManifest).toBe(afterManifest);
   });
 
   it('should update manifest after successful push', async () => {
     // Simulate successful push
-    const manifestBefore = JSON.parse(await Bun.file('.confluence-sync.json').text());
+    const manifestBefore = JSON.parse(await fs.promises.readFile('.confluence-sync.json', 'utf-8'));
     expect(manifestBefore.pages['123'].version).toBe(1);
 
     // After push (would be done by actual CLI command)

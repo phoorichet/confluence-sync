@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createSearchCommand } from '../../../src/commands/search';
+import { searchCommand } from '../../../src/commands/search';
 import { ConfigManager } from '../../../src/config/config-manager';
 import { FilterManager } from '../../../src/storage/filter-manager';
 import { SearchService } from '../../../src/sync/search-service';
@@ -24,7 +24,6 @@ vi.mock('../../../src/config/config-manager', () => ({
 }));
 
 describe('search Command', () => {
-  let searchCommand: any;
   let mockSearchService: any;
   let mockFilterManager: any;
   let mockConfigManager: any;
@@ -53,8 +52,6 @@ describe('search Command', () => {
     (SearchService.getInstance as any).mockReturnValue(mockSearchService);
     (FilterManager.getInstance as any).mockReturnValue(mockFilterManager);
     (ConfigManager.getInstance as any).mockReturnValue(mockConfigManager);
-
-    searchCommand = createSearchCommand();
   });
 
   it('should create search command with correct properties', () => {
@@ -81,9 +78,13 @@ describe('search Command', () => {
     expect(optionNames).toContain('--limit');
   });
 
-  it('should parse search query argument', () => {
-    const args = searchCommand.parse(['search', 'test query'], { from: 'user' });
-    expect(args.args).toContain('test query');
+  it('should accept a search query argument', () => {
+    // The search command accepts one optional argument (the search query)
+    // In Commander.js, registeredArguments contains the argument definitions
+    const registeredArgs = searchCommand.registeredArguments;
+    expect(registeredArgs.length).toBe(1);
+    expect(registeredArgs[0]?.name()).toBe('query');
+    expect(registeredArgs[0]?.description).toBe('Search query text');
   });
 
   it('should parse multiple filter options', () => {

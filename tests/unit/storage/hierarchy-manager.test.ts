@@ -1,15 +1,24 @@
+import * as fs from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HierarchyManager } from '../../../src/storage/hierarchy-manager';
 
-describe('HierarchyManager', () => {
+// Mock fs module
+vi.mock('node:fs', () => ({
+  existsSync: vi.fn(),
+  mkdirSync: vi.fn(),
+}));
+
+describe('hierarchyManager', () => {
   let hierarchyManager: HierarchyManager;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     hierarchyManager = HierarchyManager.getInstance();
   });
 
   afterEach(() => {
     HierarchyManager.clearInstance();
+    vi.restoreAllMocks();
   });
 
   describe('buildHierarchyPath', () => {
@@ -53,74 +62,34 @@ describe('HierarchyManager', () => {
 
   describe('ensureDirectoryStructure', () => {
     it('should create directory if it does not exist', async () => {
-      const fs = await import('node:fs');
-      const originalExists = fs.existsSync;
-      const originalMkdir = fs.mkdirSync;
-      
-      let existsCalled = false;
-      let mkdirCalled = false;
-      let mkdirPath = '';
-      
-      (fs as any).existsSync = () => {
-        existsCalled = true;
-        return false;
-      };
-      (fs as any).mkdirSync = (path: string, options: any) => {
-        mkdirCalled = true;
-        mkdirPath = path;
-        return undefined;
-      };
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.mkdirSync).mockReturnValue(undefined as any);
 
       await hierarchyManager.ensureDirectoryStructure('/test/path/file.md');
 
-      expect(existsCalled).toBe(true);
-      expect(mkdirCalled).toBe(true);
-      expect(mkdirPath).toBe('/test/path');
-
-      // Restore
-      (fs as any).existsSync = originalExists;
-      (fs as any).mkdirSync = originalMkdir;
+      expect(fs.existsSync).toHaveBeenCalledWith('/test/path');
+      expect(fs.mkdirSync).toHaveBeenCalledWith('/test/path', { recursive: true });
     });
 
     it('should not create directory if it exists', async () => {
-      const fs = await import('node:fs');
-      const originalExists = fs.existsSync;
-      const originalMkdir = fs.mkdirSync;
-      
-      let mkdirCalled = false;
-      
-      (fs as any).existsSync = () => true;
-      (fs as any).mkdirSync = () => {
-        mkdirCalled = true;
-        return undefined;
-      };
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.mkdirSync).mockReturnValue(undefined as any);
 
       await hierarchyManager.ensureDirectoryStructure('/test/path/file.md');
 
-      expect(mkdirCalled).toBe(false);
-
-      // Restore
-      (fs as any).existsSync = originalExists;
-      (fs as any).mkdirSync = originalMkdir;
+      expect(fs.existsSync).toHaveBeenCalledWith('/test/path');
+      expect(fs.mkdirSync).not.toHaveBeenCalled();
     });
 
     it('should handle directory creation errors', async () => {
-      const fs = await import('node:fs');
-      const originalExists = fs.existsSync;
-      const originalMkdir = fs.mkdirSync;
-      
-      (fs as any).existsSync = () => false;
-      (fs as any).mkdirSync = () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.mkdirSync).mockImplementation(() => {
         throw new Error('Permission denied');
-      };
+      });
 
       await expect(
         hierarchyManager.ensureDirectoryStructure('/test/path/file.md'),
       ).rejects.toThrow('CS-807');
-
-      // Restore
-      (fs as any).existsSync = originalExists;
-      (fs as any).mkdirSync = originalMkdir;
     });
   });
 
