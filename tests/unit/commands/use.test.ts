@@ -21,7 +21,7 @@ vi.mock('../../../src/utils/logger', () => ({
 // Mock the use command module to avoid process.exit issues
 vi.mock('../../../src/commands/use.ts', async () => {
   const { Command } = await vi.importActual<typeof import('commander')>('commander');
-  const actual = await vi.importActual<typeof import('../../../src/commands/use.ts')>('../../../src/commands/use.ts');
+  const _actual = await vi.importActual<typeof import('../../../src/commands/use.ts')>('../../../src/commands/use.ts');
 
   // Create a modified command that doesn't call process.exit
   const useCommand = new Command('use')
