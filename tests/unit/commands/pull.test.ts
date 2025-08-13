@@ -22,25 +22,25 @@ describe('pull Command', () => {
   it('should have correct options', async () => {
     const { pullCommand } = await import('../../../src/commands/pull');
     const options = pullCommand.options;
-    
+
     // Check we have the expected number of options
     expect(options.length).toBe(4);
-    
+
     const outputOption = options.find((opt: any) => opt.short === '-o');
     expect(outputOption).toBeDefined();
     expect(outputOption?.long).toBe('--output');
     expect(outputOption?.description).toContain('Output directory');
-    
+
     const spaceOption = options.find((opt: any) => opt.short === '-s');
     expect(spaceOption).toBeDefined();
     expect(spaceOption?.long).toBe('--space');
     expect(spaceOption?.description).toContain('Confluence space');
-    
+
     const recursiveOption = options.find((opt: any) => opt.short === '-r');
     expect(recursiveOption).toBeDefined();
     expect(recursiveOption?.long).toBe('--recursive');
     expect(recursiveOption?.description).toContain('children');
-    
+
     const depthOption = options.find((opt: any) => opt.long === '--max-depth');
     expect(depthOption).toBeDefined();
     expect(depthOption?.description).toContain('Maximum depth');

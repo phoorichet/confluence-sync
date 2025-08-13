@@ -704,6 +704,21 @@ export class ConfluenceAPIClient {
       });
     });
   }
+
+  /**
+   * Build the web URL for a Confluence page
+   */
+  public getPageUrl(pageId: string): string {
+    if (!this.baseUrl) {
+      return '';
+    }
+
+    // Extract the base Confluence URL (without /api/v2)
+    const baseConfluenceUrl = this.baseUrl.replace(/\/api\/v2$/, '');
+
+    // Build the page URL
+    return `${baseConfluenceUrl}/pages/${pageId}`;
+  }
 }
 
 // Export singleton instance

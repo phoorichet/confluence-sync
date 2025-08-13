@@ -3,7 +3,19 @@ import rehypeRemark from 'rehype-remark';
 import remarkGfm from 'remark-gfm';
 import remarkStringify from 'remark-stringify';
 import { unified } from 'unified';
+import * as yaml from 'yaml';
 import { logger } from '../utils/logger.js';
+
+interface PageMetadata {
+  pageId: string;
+  spaceKey: string;
+  title: string;
+  version: number;
+  lastModified: string;
+  author?: string;
+  parentId?: string;
+  url?: string;
+}
 
 export class ConfluenceToMarkdownConverter {
   private processor;
@@ -26,10 +38,10 @@ export class ConfluenceToMarkdownConverter {
   /**
    * Convert Confluence storage format (XHTML) to Markdown
    */
-  async convert(confluenceContent: string): Promise<string> {
+  async convert(confluenceContent: string, metadata?: PageMetadata): Promise<string> {
     try {
       if (!confluenceContent || confluenceContent.trim().length === 0) {
-        return '';
+        return metadata ? this.addFrontmatter('', metadata) : '';
       }
 
       // Reset panels for each conversion
@@ -43,13 +55,88 @@ export class ConfluenceToMarkdownConverter {
       const markdown = String(result);
 
       // Post-process to clean up any artifacts
-      const cleaned = this.postprocessMarkdown(markdown);
+      let cleaned = this.postprocessMarkdown(markdown);
+
+      // Add frontmatter if metadata is provided
+      if (metadata) {
+        cleaned = this.addFrontmatter(cleaned, metadata);
+      }
 
       return cleaned;
     }
     catch (error) {
       logger.error('Failed to convert Confluence content to Markdown', error);
       throw new Error(`CS-500: Failed to convert content: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Add YAML frontmatter with page metadata to markdown content
+   */
+  public addFrontmatter(markdownContent: string, metadata: PageMetadata): string {
+    try {
+      // First, strip any existing frontmatter to avoid duplication
+      let content = markdownContent;
+      if (content.startsWith('---')) {
+        const lines = content.split('\n');
+        let endIndex = -1;
+        
+        // Find the closing delimiter
+        for (let i = 1; i < lines.length; i++) {
+          if (lines[i] === '---') {
+            endIndex = i;
+            break;
+          }
+        }
+        
+        // If frontmatter found, remove it
+        if (endIndex > 0) {
+          const contentLines = lines.slice(endIndex + 1);
+          // Remove leading empty lines
+          while (contentLines.length > 0 && contentLines[0]?.trim() === '') {
+            contentLines.shift();
+          }
+          content = contentLines.join('\n');
+        }
+      }
+
+      // Create the metadata object with proper escaping
+      const frontmatterData = {
+        confluence: {
+          pageId: String(metadata.pageId),
+          spaceKey: metadata.spaceKey,
+          title: metadata.title,
+          version: metadata.version,
+          lastModified: metadata.lastModified,
+          author: metadata.author || null,
+          parentId: metadata.parentId ? String(metadata.parentId) : null,
+          url: metadata.url || null,
+        },
+      };
+
+      // Generate YAML with proper formatting
+      const yamlContent = yaml.stringify(frontmatterData, {
+        indent: 2,
+        lineWidth: 0,
+        nullStr: 'null',
+      });
+
+      // Build the frontmatter with the DO NOT EDIT comment
+      const frontmatter = [
+        '---',
+        '# DO NOT EDIT - Metadata from Confluence (read-only)',
+        yamlContent.trim(),
+        '---',
+        '',
+      ].join('\n');
+
+      // Combine frontmatter with content
+      return frontmatter + content;
+    }
+    catch (error) {
+      logger.error('Failed to add frontmatter to markdown', error);
+      // Return content without frontmatter if there's an error
+      return markdownContent;
     }
   }
 

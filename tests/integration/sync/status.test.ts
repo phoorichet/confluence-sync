@@ -20,10 +20,10 @@ describe('status Command Integration', () => {
   beforeEach(async () => {
     // Clear all mocks before each test
     vi.clearAllMocks();
-    
+
     // Save original working directory
     originalCwd = process.cwd();
-    
+
     // Create temp directory
     tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'status-test-'));
     // Don't use process.chdir as it affects all parallel tests
@@ -41,7 +41,8 @@ describe('status Command Integration', () => {
             when: new Date().toISOString(),
           },
         } as any;
-      } else if (pageId === '456') {
+      }
+      else if (pageId === '456') {
         return {
           id: '456',
           title: 'Test Page 2',
@@ -51,7 +52,8 @@ describe('status Command Integration', () => {
             when: new Date().toISOString(),
           },
         } as any;
-      } else if (pageId === '789') {
+      }
+      else if (pageId === '789') {
         return {
           id: '789',
           title: 'Test Page 3',
@@ -149,10 +151,11 @@ describe('status Command Integration', () => {
     // Ensure we're back in the original directory
     try {
       process.chdir(originalCwd);
-    } catch {
+    }
+    catch {
       // Ignore if directory doesn't exist
     }
-    
+
     if (server) {
       server.close();
     }
@@ -226,20 +229,21 @@ describe('status Command Integration', () => {
     try {
       process.chdir(tempDir);
       await program.parseAsync(['status'], { from: 'user' });
-    } finally {
+    }
+    finally {
       process.chdir(originalCwd);
     }
 
     // Check output - status should show information about the pages
     const allLogs = consoleLogSpy.mock.calls.map((call: any[]) => call[0]).join('\n');
-    
+
     // Should show local changes
     expect(allLogs).toContain('page2.md');
     expect(allLogs).toContain('modified');
-    
-    // Should show remote changes  
+
+    // Should show remote changes
     expect(allLogs).toContain('page1.md');
-    
+
     // Should show conflicts
     expect(allLogs).toContain('page3.md');
   });
@@ -276,12 +280,12 @@ describe('status Command Integration', () => {
     // Create local file
     fs.writeFileSync(path.join(tempDir, 'test.md'), '# Test Page');
 
-
     // Run status command with --json from the temp directory
     try {
       process.chdir(tempDir);
       await program.parseAsync(['status', '--json'], { from: 'user' });
-    } finally {
+    }
+    finally {
       process.chdir(originalCwd);
     }
 
@@ -348,12 +352,12 @@ describe('status Command Integration', () => {
     fs.writeFileSync(path.join(tempDir, 'space1.md'), '# Space 1');
     fs.writeFileSync(path.join(tempDir, 'space2.md'), '# Space 2');
 
-
     // Run status command with space filter from the temp directory
     try {
       process.chdir(tempDir);
       await program.parseAsync(['status', '--space', 'SPACE1'], { from: 'user' });
-    } finally {
+    }
+    finally {
       process.chdir(originalCwd);
     }
 
@@ -383,7 +387,8 @@ describe('status Command Integration', () => {
     try {
       process.chdir(tempDir);
       await program.parseAsync(['status'], { from: 'user' });
-    } finally {
+    }
+    finally {
       process.chdir(originalCwd);
     }
 

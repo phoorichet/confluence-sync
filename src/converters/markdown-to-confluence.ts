@@ -5,17 +5,55 @@ import { unified } from 'unified';
 
 export class MarkdownToConfluenceConverter {
   async convert(markdown: string): Promise<string> {
+    // Strip frontmatter if present
+    const strippedMarkdown = this.stripFrontmatter(markdown);
+
     // Parse markdown to AST
     const processor = unified()
       .use(remarkParse)
       .use(remarkGfm); // Support for tables, strikethrough, etc.
 
-    const tree = processor.parse(markdown);
+    const tree = processor.parse(strippedMarkdown);
 
     // Convert AST to Confluence storage format
     const html = this.astToConfluence(tree as Root);
 
     return html;
+  }
+
+  /**
+   * Strip YAML frontmatter from markdown content
+   */
+  public stripFrontmatter(markdown: string): string {
+    // Check if content starts with frontmatter delimiter
+    if (!markdown.startsWith('---')) {
+      return markdown;
+    }
+
+    // Find the closing delimiter
+    const lines = markdown.split('\n');
+    let endIndex = -1;
+
+    // Start from line 1 (skip the opening ---) to find closing ---
+    for (let i = 1; i < lines.length; i++) {
+      if (lines[i] === '---') {
+        endIndex = i;
+        break;
+      }
+    }
+
+    // If closing delimiter found, return content after it
+    if (endIndex > 0) {
+      // Join lines after frontmatter, removing leading empty lines
+      const contentLines = lines.slice(endIndex + 1);
+      while (contentLines.length > 0 && contentLines[0]?.trim() === '') {
+        contentLines.shift();
+      }
+      return contentLines.join('\n');
+    }
+
+    // If no closing delimiter found, return original content
+    return markdown;
   }
 
   private astToConfluence(tree: Root): string {

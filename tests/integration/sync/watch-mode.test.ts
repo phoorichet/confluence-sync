@@ -18,11 +18,11 @@ describe('watch Mode Integration', () => {
   beforeEach(async () => {
     // Save original working directory
     originalCwd = process.cwd();
-    
+
     // Create temp directory
     tempDir = path.join(originalCwd, `temp-test-${Date.now()}`);
     await fs.mkdir(tempDir, { recursive: true });
-    
+
     // Change to temp directory for the test
     process.chdir(tempDir);
 
@@ -160,7 +160,7 @@ describe('watch Mode Integration', () => {
     });
 
     await watcher.start();
-    
+
     // Wait for watcher to initialize
     await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -188,7 +188,7 @@ describe('watch Mode Integration', () => {
     watcher = new FileWatcher(config, syncEngine, manifestManager);
 
     await watcher.start();
-    
+
     // Wait for watcher to initialize
     await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -222,7 +222,7 @@ describe('watch Mode Integration', () => {
     });
 
     await watcher.start();
-    
+
     // Wait for watcher to initialize
     await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -275,7 +275,7 @@ describe('watch Mode Integration', () => {
     });
 
     await watcher.start();
-    
+
     // Wait for watcher to initialize
     await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -302,7 +302,7 @@ describe('watch Mode Integration', () => {
 
     watcher = new FileWatcher(config, syncEngine, manifestManager);
     await watcher.start();
-    
+
     // Wait for watcher to initialize
     await new Promise(resolve => setTimeout(resolve, 100));
 

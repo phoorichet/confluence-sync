@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConfluenceAPIClient } from '../../../src/api/client';
 import { AuthManager } from '../../../src/auth/auth-manager';
 
-
 describe('confluenceAPIClient', () => {
   let client: ConfluenceAPIClient;
   let mockAuthManager: any;

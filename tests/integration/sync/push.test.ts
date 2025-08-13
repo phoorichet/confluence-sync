@@ -108,7 +108,7 @@ describe('push Integration', () => {
       pages: Object.fromEntries(manifest.pages),
     };
 
-    await fs.promises.writeFile('.confluence-sync.json', JSON.stringify(manifestJson, null, 2));
+    await fs.promises.writeFile('.csmanifest.json', JSON.stringify(manifestJson, null, 2));
 
     // Create test markdown file
     await fs.promises.writeFile('test-page.md', `# Updated Test Page
@@ -199,17 +199,17 @@ console.log('Hello, World!');
     // - Output contains preview information
     // - Manifest file is unchanged
 
-    const originalManifest = await fs.promises.readFile('.confluence-sync.json', 'utf-8');
+    const originalManifest = await fs.promises.readFile('.csmanifest.json', 'utf-8');
 
     // After dry-run (simulated)
-    const afterManifest = await fs.promises.readFile('.confluence-sync.json', 'utf-8');
+    const afterManifest = await fs.promises.readFile('.csmanifest.json', 'utf-8');
 
     expect(originalManifest).toBe(afterManifest);
   });
 
   it('should update manifest after successful push', async () => {
     // Simulate successful push
-    const manifestBefore = JSON.parse(await fs.promises.readFile('.confluence-sync.json', 'utf-8'));
+    const manifestBefore = JSON.parse(await fs.promises.readFile('.csmanifest.json', 'utf-8'));
     expect(manifestBefore.pages['123'].version).toBe(1);
 
     // After push (would be done by actual CLI command)

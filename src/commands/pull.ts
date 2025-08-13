@@ -345,12 +345,25 @@ async function savePage(
   const pageSpaceKey = spaceKey || page.spaceId || '';
   const pagePosition = position ?? page.position ?? 0;
 
-  // Convert to Markdown
+  // Convert to Markdown with metadata
   if (progress) {
     progress.update('Converting to Markdown...');
   }
   const converter = new ConfluenceToMarkdownConverter();
-  const markdown = await converter.convert(pageContent);
+
+  // Build metadata for frontmatter
+  const metadata = {
+    pageId: page.id,
+    spaceKey: pageSpaceKey,
+    title: pageTitle,
+    version: pageVersion,
+    lastModified: page.version?.createdAt || page.createdAt || new Date().toISOString(),
+    author: page.version?.authorId || page.authorId,
+    parentId: page.parentId,
+    url: apiClient.getPageUrl(page.id),
+  };
+
+  const markdown = await converter.convert(pageContent, metadata);
 
   // Determine file path based on hierarchy
   const fileManager = FileManager.getInstance();

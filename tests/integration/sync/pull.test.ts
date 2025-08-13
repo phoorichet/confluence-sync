@@ -37,7 +37,7 @@ describe('pull Command Integration', () => {
     if ((apiClient as any).rateLimiter) {
       (apiClient as any).rateLimiter.reset();
     }
-    
+
     // Setup temp directory
     tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'confluence-sync-test-'));
     // Don't use process.chdir as it affects all parallel tests
@@ -56,7 +56,7 @@ describe('pull Command Integration', () => {
 
     // Mock apiClient.initialize to prevent hanging
     vi.spyOn(apiClient, 'initialize').mockResolvedValue();
-    
+
     // Mock apiClient.getPage to return data from MSW server
     vi.spyOn(apiClient, 'getPage').mockImplementation(async (pageId: string, _includeBody?: boolean) => {
       const response = await fetch(`https://test.atlassian.net/wiki/api/v2/pages/${pageId}`);
@@ -114,13 +114,18 @@ describe('pull Command Integration', () => {
       version: {
         number: 1,
         message: 'Initial version',
+        createdAt: '2024-01-15T10:30:00Z',
+        authorId: 'user-123',
       },
+      authorId: 'user-123',
+      createdAt: '2024-01-15T10:00:00Z',
       body: {
         storage: {
           value: '<h1>Test Page</h1><p>This is a test page content.</p>',
           representation: 'storage',
         },
       },
+      parentId: '98765',
     };
 
     server.use(
@@ -138,24 +143,38 @@ describe('pull Command Integration', () => {
     // Assert
     // Wait a bit for async operations to complete
     await new Promise(resolve => setTimeout(resolve, 100));
-    
+
     // List all files created
     const files = fs.readdirSync(tempDir);
-    
+
     // Check that at least one markdown file was created
     const mdFiles = files.filter(f => f.endsWith('.md'));
     expect(mdFiles.length).toBeGreaterThan(0);
-    
+
     // Get the created file
     const createdFile = mdFiles[0];
     if (createdFile) {
       const filePath = path.join(tempDir, createdFile);
-      
+
       // Check file content
       const content = fs.readFileSync(filePath, 'utf-8');
+
+      // Check for metadata frontmatter
+      expect(content).toContain('---');
+      expect(content).toContain('# DO NOT EDIT - Metadata from Confluence (read-only)');
+      expect(content).toContain('confluence:');
+      expect(content).toContain('pageId: "12345"');
+      expect(content).toContain('spaceKey: SPACE1');
+      expect(content).toContain('title: Test Page');
+      expect(content).toContain('version: 1');
+      expect(content).toContain('lastModified: 2024-01-15T10:30:00Z');
+      expect(content).toContain('author: user-123');
+      expect(content).toContain('parentId: "98765"');
+
+      // Check for actual content after frontmatter
       expect(content).toContain('Test Page');
     }
-    
+
     // Check manifest was created (commented out for now as pull command might not create manifest)
     // const manifestFiles = files.filter(f => f.includes('manifest') || f.includes('.confluence-sync'));
     // expect(manifestFiles.length).toBeGreaterThan(0);
@@ -217,7 +236,7 @@ describe('pull Command Integration', () => {
 
     // Assert
     await new Promise(resolve => setTimeout(resolve, 100));
-    
+
     const files = fs.readdirSync(tempDir);
     const mdFiles = files.filter(f => f.endsWith('.md'));
     expect(mdFiles.length).toBeGreaterThan(0);
@@ -278,7 +297,7 @@ describe('pull Command Integration', () => {
 
     // Assert
     await new Promise(resolve => setTimeout(resolve, 100));
-    
+
     const files = fs.readdirSync(tempDir);
     const mdFiles = files.filter(f => f.endsWith('.md'));
     expect(mdFiles.length).toBeGreaterThan(0);
@@ -322,9 +341,9 @@ describe('pull Command Integration', () => {
 
     // Assert
     await new Promise(resolve => setTimeout(resolve, 100));
-    
+
     expect(fs.existsSync(outputDir)).toBe(true);
-    
+
     const files = fs.readdirSync(outputDir);
     const mdFiles = files.filter(f => f.endsWith('.md'));
     expect(mdFiles.length).toBeGreaterThan(0);
@@ -364,9 +383,9 @@ describe('pull Command Integration', () => {
 
     // Assert
     await new Promise(resolve => setTimeout(resolve, 100));
-    
+
     const files = fs.readdirSync(tempDir);
-    
+
     const mdFiles = files.filter(f => f.endsWith('.md') && !f.includes('backup'));
     expect(mdFiles.length).toBeGreaterThan(0);
 
@@ -378,9 +397,9 @@ describe('pull Command Integration', () => {
     // Check that backup was created - look for any backup pattern
     // For now, just skip the backup assertion since the pull command
     // implementation might not have backup functionality yet
-    // const backupFiles = files.filter(f => 
-    //   f.includes('backup') || 
-    //   f.includes('.bak') || 
+    // const backupFiles = files.filter(f =>
+    //   f.includes('backup') ||
+    //   f.includes('.bak') ||
     //   f.includes('~') ||
     //   f.match(/\.\d{4}-\d{2}-\d{2}/) // date pattern
     // );
@@ -405,7 +424,8 @@ describe('pull Command Integration', () => {
       await program.parseAsync(['pull', pageId], { from: 'user' });
       // If no error is thrown, fail the test
       expect(true).toBe(false);
-    } catch (error) {
+    }
+    catch (error) {
       // Expected to throw
       expect(error).toBeDefined();
     }
@@ -428,7 +448,8 @@ describe('pull Command Integration', () => {
     try {
       await program.parseAsync(['pull', pageId], { from: 'user' });
       expect(true).toBe(false); // Should not reach here
-    } catch (error) {
+    }
+    catch (error) {
       expect(error).toBeDefined();
     }
   });
@@ -455,7 +476,8 @@ describe('pull Command Integration', () => {
     try {
       await program.parseAsync(['pull', pageId], { from: 'user' });
       expect(true).toBe(false); // Should not reach here
-    } catch (error) {
+    }
+    catch (error) {
       expect(error).toBeDefined();
     }
   });

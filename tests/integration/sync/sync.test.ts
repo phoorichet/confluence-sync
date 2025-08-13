@@ -13,7 +13,6 @@ import { logger } from '../../../src/utils/logger';
 
 describe('sync Integration Tests', () => {
   const testDir = path.join(__dirname, 'test-workspace');
-  const _manifestPath = path.join(testDir, '.confluence-sync.json');
   let syncEngine: SyncEngine;
   let manifestManager: ManifestManager;
   let originalCwd: string;
@@ -29,7 +28,7 @@ describe('sync Integration Tests', () => {
 
     // Create test directory
     mkdirSync(testDir, { recursive: true });
-    
+
     // Change to test directory
     process.chdir(testDir);
 
@@ -49,7 +48,7 @@ describe('sync Integration Tests', () => {
   afterEach(() => {
     // Restore original working directory
     process.chdir(originalCwd);
-    
+
     // Clean up test directory
     rmSync(testDir, { recursive: true, force: true });
 
@@ -58,7 +57,7 @@ describe('sync Integration Tests', () => {
     ManifestManager.clearInstance();
     FileManager.clearInstance();
     ChangeDetector.clearInstance();
-    
+
     // Restore all mocks
     vi.restoreAllMocks();
   });
@@ -73,7 +72,7 @@ describe('sync Integration Tests', () => {
       writeFileSync(localFile1, '# Local Changed Content');
       writeFileSync(localFile2, '# Original Content');
       writeFileSync(localFile3, '# Unchanged Content');
-      
+
       // Mock FileManager
       const fileManager = FileManager.getInstance();
       vi.spyOn(fileManager, 'readFile').mockImplementation((filePath: string) => {
@@ -130,15 +129,17 @@ describe('sync Integration Tests', () => {
       vi.spyOn(manifestManager, 'load').mockResolvedValue(testManifest);
       vi.spyOn(manifestManager, 'updatePage').mockResolvedValue();
       vi.spyOn(manifestManager, 'save').mockResolvedValue();
-      
+
       // Mock ChangeDetector
       const changeDetector = ChangeDetector.getInstance();
       vi.spyOn(changeDetector, 'getChangeState').mockImplementation(async (page: Page) => {
         if (page.id === 'page1') {
           return 'local-only'; // Local changes
-        } else if (page.id === 'page2') {
+        }
+        else if (page.id === 'page2') {
           return 'remote-only'; // Remote changes
-        } else {
+        }
+        else {
           return 'unchanged'; // No changes
         }
       });
@@ -166,7 +167,7 @@ describe('sync Integration Tests', () => {
         id: 'page1',
         version: { number: 2 },
       } as any);
-      
+
       // Mock converters
       vi.spyOn(MarkdownToConfluenceConverter.prototype, 'convert').mockResolvedValue('<p>Converted HTML</p>');
       vi.spyOn(ConfluenceToMarkdownConverter.prototype, 'convert').mockResolvedValue('# Converted Markdown');
@@ -192,7 +193,7 @@ describe('sync Integration Tests', () => {
       // Setup conflicted file
       const conflictFile = path.join(testDir, 'conflict.md');
       writeFileSync(conflictFile, '# Local Changed Content');
-      
+
       // Mock FileManager
       const fileManager = FileManager.getInstance();
       vi.spyOn(fileManager, 'readFile').mockImplementation((filePath: string) => {
@@ -222,7 +223,7 @@ describe('sync Integration Tests', () => {
 
       vi.spyOn(manifestManager, 'load').mockResolvedValue(testManifest);
       vi.spyOn(manifestManager, 'save').mockResolvedValue();
-      
+
       // Mock ChangeDetector to return conflict
       const changeDetector = ChangeDetector.getInstance();
       vi.spyOn(changeDetector, 'getChangeState').mockResolvedValue('both-changed');
@@ -249,7 +250,7 @@ describe('sync Integration Tests', () => {
     it('should respect dry-run mode and not make changes', async () => {
       const testFile = path.join(testDir, 'test.md');
       writeFileSync(testFile, '# Test Content');
-      
+
       // Mock FileManager
       const fileManager = FileManager.getInstance();
       vi.spyOn(fileManager, 'readFile').mockImplementation((filePath: string) => {
@@ -279,14 +280,14 @@ describe('sync Integration Tests', () => {
 
       vi.spyOn(manifestManager, 'load').mockResolvedValue(testManifest);
       vi.spyOn(manifestManager, 'save').mockResolvedValue();
-      
+
       // Mock ChangeDetector to return local changes
       const changeDetector = ChangeDetector.getInstance();
       vi.spyOn(changeDetector, 'getChangeState').mockResolvedValue('local-only');
-      
+
       // Mock converters
       vi.spyOn(MarkdownToConfluenceConverter.prototype, 'convert').mockResolvedValue('<p>Converted HTML</p>');
-      
+
       const updateSpy = vi.spyOn(apiClient, 'updatePage');
       const manifestUpdateSpy = vi.spyOn(manifestManager, 'updatePage');
 
@@ -306,7 +307,7 @@ describe('sync Integration Tests', () => {
     it('should handle errors gracefully', async () => {
       const testFile = path.join(testDir, 'error.md');
       writeFileSync(testFile, '# Error Test');
-      
+
       // Mock FileManager
       const fileManager = FileManager.getInstance();
       vi.spyOn(fileManager, 'readFile').mockImplementation((filePath: string) => {
@@ -336,11 +337,11 @@ describe('sync Integration Tests', () => {
 
       vi.spyOn(manifestManager, 'load').mockResolvedValue(testManifest);
       vi.spyOn(manifestManager, 'save').mockResolvedValue();
-      
+
       // Mock ChangeDetector to return local changes
       const changeDetector = ChangeDetector.getInstance();
       vi.spyOn(changeDetector, 'getChangeState').mockResolvedValue('local-only');
-      
+
       // Mock converters
       vi.spyOn(MarkdownToConfluenceConverter.prototype, 'convert').mockResolvedValue('<p>Converted HTML</p>');
 
@@ -366,7 +367,7 @@ describe('sync Integration Tests', () => {
         writeFileSync(filePath, `# File ${i} Content`);
         files.push(filePath);
       }
-      
+
       // Mock FileManager
       const fileManager = FileManager.getInstance();
       vi.spyOn(fileManager, 'readFile').mockImplementation((filePath: string) => {
@@ -401,11 +402,11 @@ describe('sync Integration Tests', () => {
       vi.spyOn(manifestManager, 'load').mockResolvedValue(testManifest);
       vi.spyOn(manifestManager, 'updatePage').mockResolvedValue();
       vi.spyOn(manifestManager, 'save').mockResolvedValue();
-      
+
       // Mock ChangeDetector to return local changes for all pages
       const changeDetector = ChangeDetector.getInstance();
       vi.spyOn(changeDetector, 'getChangeState').mockResolvedValue('local-only');
-      
+
       // Mock converters
       vi.spyOn(MarkdownToConfluenceConverter.prototype, 'convert').mockResolvedValue('<p>Converted HTML</p>');
 

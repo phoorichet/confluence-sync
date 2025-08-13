@@ -18,19 +18,19 @@ describe('auth command', () => {
     const authCommandModule = await import('../../../src/commands/auth');
     const authCommand = authCommandModule.default || authCommandModule.authCommand;
     const options = authCommand.options;
-    
+
     const urlOption = options.find((opt: any) => opt.short === '-u');
     expect(urlOption).toBeDefined();
     expect(urlOption?.long).toBe('--url');
-    
+
     const emailOption = options.find((opt: any) => opt.short === '-e');
     expect(emailOption).toBeDefined();
     expect(emailOption?.long).toBe('--email');
-    
+
     const tokenOption = options.find((opt: any) => opt.short === '-t');
     expect(tokenOption).toBeDefined();
     expect(tokenOption?.long).toBe('--token');
-    
+
     const profileOption = options.find((opt: any) => opt.short === '-p');
     expect(profileOption).toBeDefined();
     expect(profileOption?.long).toBe('--profile');
@@ -40,11 +40,11 @@ describe('auth command', () => {
     const authCommandModule = await import('../../../src/commands/auth');
     const authCommand = authCommandModule.default || authCommandModule.authCommand;
     const commands = authCommand.commands;
-    
+
     const statusCommand = commands.find((cmd: any) => cmd.name() === 'status');
     expect(statusCommand).toBeDefined();
     expect(statusCommand?.description()).toContain('Check authentication status');
-    
+
     const clearCommand = commands.find((cmd: any) => cmd.name() === 'clear');
     expect(clearCommand).toBeDefined();
     expect(clearCommand?.description()).toContain('Remove stored credentials');

@@ -8,6 +8,91 @@ describe('markdownToConfluenceConverter', () => {
     converter = new MarkdownToConfluenceConverter();
   });
 
+  describe('stripFrontmatter', () => {
+    it('should strip YAML frontmatter from markdown', () => {
+      const markdown = `---
+# DO NOT EDIT - Metadata from Confluence (read-only)
+confluence:
+  pageId: "123456"
+  spaceKey: PROJ
+  title: Page Title
+  version: 5
+---
+
+# Actual Content
+
+This is the page content.`;
+
+      const result = converter.stripFrontmatter(markdown);
+
+      expect(result).toBe('# Actual Content\n\nThis is the page content.');
+      expect(result).not.toContain('---');
+      expect(result).not.toContain('pageId');
+      expect(result).not.toContain('DO NOT EDIT');
+    });
+
+    it('should handle markdown without frontmatter', () => {
+      const markdown = '# Regular Markdown\n\nNo frontmatter here.';
+      const result = converter.stripFrontmatter(markdown);
+
+      expect(result).toBe(markdown);
+    });
+
+    it('should handle frontmatter with no content after', () => {
+      const markdown = `---
+confluence:
+  pageId: "123"
+---`;
+
+      const result = converter.stripFrontmatter(markdown);
+      expect(result).toBe('');
+    });
+
+    it('should preserve content with --- in the body', () => {
+      const markdown = `---
+meta: data
+---
+
+# Content
+
+Some text with --- dashes in it.`;
+
+      const result = converter.stripFrontmatter(markdown);
+      expect(result).toBe('# Content\n\nSome text with --- dashes in it.');
+    });
+
+    it('should remove leading empty lines after frontmatter', () => {
+      const markdown = `---
+meta: data
+---
+
+
+# Content`;
+
+      const result = converter.stripFrontmatter(markdown);
+      expect(result).toBe('# Content');
+    });
+  });
+
+  describe('convert with frontmatter', () => {
+    it('should strip frontmatter before conversion', async () => {
+      const markdown = `---
+confluence:
+  pageId: "123456"
+---
+
+# Title
+
+Content here.`;
+
+      const result = await converter.convert(markdown);
+      expect(result).toContain('<h1>Title</h1>');
+      expect(result).toContain('<p>Content here.</p>');
+      expect(result).not.toContain('pageId');
+      expect(result).not.toContain('---');
+    });
+  });
+
   describe('basic conversions', () => {
     it('should convert empty content', async () => {
       const result = await converter.convert('');

@@ -29,7 +29,7 @@ describe('fileManager Streaming Operations', () => {
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true });
     }
-    
+
     // Clear singleton instance for clean state
     FileManager.clearInstance();
   });

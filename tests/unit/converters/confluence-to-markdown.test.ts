@@ -8,6 +8,141 @@ describe('confluenceToMarkdownConverter', () => {
     converter = new ConfluenceToMarkdownConverter();
   });
 
+  describe('addFrontmatter', () => {
+    it('should add YAML frontmatter with complete metadata', () => {
+      const metadata = {
+        pageId: '123456',
+        spaceKey: 'PROJ',
+        title: 'Page Title',
+        version: 5,
+        lastModified: '2024-01-15T10:30:00Z',
+        author: 'john.doe@example.com',
+        parentId: '789012',
+        url: 'https://instance.atlassian.net/wiki/spaces/PROJ/pages/123456',
+      };
+
+      const content = '# Test Content\n\nThis is the page content.';
+      const result = converter.addFrontmatter(content, metadata);
+
+      expect(result).toContain('---');
+      expect(result).toContain('# DO NOT EDIT - Metadata from Confluence (read-only)');
+      expect(result).toContain('confluence:');
+      expect(result).toContain('pageId: "123456"');
+      expect(result).toContain('spaceKey: PROJ');
+      expect(result).toContain('title: Page Title');
+      expect(result).toContain('version: 5');
+      expect(result).toContain('lastModified: 2024-01-15T10:30:00Z');
+      expect(result).toContain('author: john.doe@example.com');
+      expect(result).toContain('parentId: "789012"');
+      expect(result).toContain('url: https://instance.atlassian.net/wiki/spaces/PROJ/pages/123456');
+      expect(result).toContain('# Test Content');
+    });
+
+    it('should handle metadata with missing optional fields', () => {
+      const metadata = {
+        pageId: '123456',
+        spaceKey: 'PROJ',
+        title: 'Page Title',
+        version: 1,
+        lastModified: '2024-01-15T10:30:00Z',
+      };
+
+      const content = '# Content';
+      const result = converter.addFrontmatter(content, metadata);
+
+      expect(result).toContain('pageId: "123456"');
+      expect(result).toContain('author: null');
+      expect(result).toContain('parentId: null');
+      expect(result).toContain('url: null');
+    });
+
+    it('should escape special characters in YAML values', () => {
+      const metadata = {
+        pageId: '123456',
+        spaceKey: 'PROJ',
+        title: 'Title with "quotes" and: colons',
+        version: 1,
+        lastModified: '2024-01-15T10:30:00Z',
+        author: 'user@domain.com',
+      };
+
+      const content = '# Content';
+      const result = converter.addFrontmatter(content, metadata);
+
+      expect(result).toContain('title: \'Title with "quotes" and: colons\'');
+    });
+
+    it('should convert with metadata in convert method', async () => {
+      const metadata = {
+        pageId: '123456',
+        spaceKey: 'PROJ',
+        title: 'Test Page',
+        version: 2,
+        lastModified: '2024-01-15T10:30:00Z',
+      };
+
+      const html = '<h1>Title</h1><p>Content</p>';
+      const result = await converter.convert(html, metadata);
+
+      expect(result).toContain('---');
+      expect(result).toContain('# DO NOT EDIT - Metadata from Confluence (read-only)');
+      expect(result).toContain('pageId: "123456"');
+      expect(result).toContain('# Title');
+      expect(result).toContain('Content');
+    });
+
+    it('should replace existing frontmatter when adding new metadata', () => {
+      const existingContent = `---
+# DO NOT EDIT - Metadata from Confluence (read-only)
+confluence:
+  pageId: "OLD123"
+  spaceKey: OLDPROJ
+  title: Old Title
+  version: 1
+  lastModified: 2024-01-01T00:00:00Z
+  author: null
+  parentId: null
+  url: null
+---
+
+# Actual Content
+
+This is the page content.`;
+
+      const newMetadata = {
+        pageId: 'NEW456',
+        spaceKey: 'NEWPROJ',
+        title: 'New Title',
+        version: 2,
+        lastModified: '2024-12-15T10:30:00Z',
+        author: 'new.user@example.com',
+        parentId: '789',
+        url: 'https://new.url/page',
+      };
+
+      const result = converter.addFrontmatter(existingContent, newMetadata);
+
+      // Should only have one set of frontmatter
+      const frontmatterCount = (result.match(/^---$/gm) || []).length;
+      expect(frontmatterCount).toBe(2); // Only opening and closing
+
+      // Should contain new metadata
+      expect(result).toContain('pageId: NEW456');
+      expect(result).toContain('spaceKey: NEWPROJ');
+      expect(result).toContain('title: New Title');
+      expect(result).toContain('version: 2');
+      
+      // Should NOT contain old metadata
+      expect(result).not.toContain('OLD123');
+      expect(result).not.toContain('OLDPROJ');
+      expect(result).not.toContain('Old Title');
+      
+      // Should preserve actual content
+      expect(result).toContain('# Actual Content');
+      expect(result).toContain('This is the page content.');
+    });
+  });
+
   describe('convert', () => {
     it('should convert empty content', async () => {
       const result = await converter.convert('');
