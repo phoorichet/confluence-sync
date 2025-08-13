@@ -427,17 +427,23 @@ export class ConfluenceAPIClient {
     }, { timeout: 30000 });
   }
 
-  public async getSpacePages(spaceId: number, options: { limit?: number } = {}) {
+  public async getSpacePages(spaceId: number, options: {
+    status?: 'current' | 'archived' | 'trashed' | 'deleted';
+    limit?: number;
+    cursor?: string;
+  } = {}) {
     return this.executeWithProtection(async () => {
-      const { limit = 250 } = options;
+      const { limit = 250, cursor, status } = options;
 
-      const response = await this.client.GET('/pages', {
+      const response = await this.client.GET('/spaces/{id}/pages', {
         params: {
+          path: { id: spaceId },
           query: {
-            'space-id': [spaceId],
+            'status': status ? [status] : undefined,
             limit,
             'sort': 'id',
             'body-format': 'storage',
+            cursor,
           },
         },
       });

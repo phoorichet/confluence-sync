@@ -170,12 +170,17 @@ async function pullSpace(spaceKey: string, outputDir: string, progress: any): Pr
   const folders: FolderSingle[] = [];
   const limit = 250;
   let hasMore = true;
+  let cursor: string | undefined;
 
   while (hasMore) {
-    const pages = await apiClient.getSpacePages(+space.id, { limit });
+    const pages = await apiClient.getSpacePages(+space.id, { status: 'current', limit, cursor });
     allPages.push(...pages?.results || []);
 
-    hasMore = !!pages._links?.next;
+    const url = new URL(`https://example.com${pages._links?.next}` || '');
+    cursor = url.searchParams.get('cursor') ?? undefined;
+    console.log(`Next cursor: ${cursor}`);
+
+    hasMore = !!cursor;
 
     progress.update(`Fetched ${allPages.length} pages from space ${spaceKey}...`);
   }
@@ -356,10 +361,12 @@ async function savePage(
     pageId: page.id,
     spaceKey: pageSpaceKey,
     title: pageTitle,
+    status: page.status,
     version: pageVersion,
     lastModified: page.version?.createdAt || page.createdAt || new Date().toISOString(),
     author: page.version?.authorId || page.authorId,
     parentId: page.parentId,
+    parentType: page.parentType,
     url: apiClient.getPageUrl(page.id),
   };
 

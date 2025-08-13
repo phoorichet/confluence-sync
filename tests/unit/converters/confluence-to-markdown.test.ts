@@ -14,10 +14,12 @@ describe('confluenceToMarkdownConverter', () => {
         pageId: '123456',
         spaceKey: 'PROJ',
         title: 'Page Title',
+        status: 'current',
         version: 5,
         lastModified: '2024-01-15T10:30:00Z',
         author: 'john.doe@example.com',
         parentId: '789012',
+        parentType: 'page',
         url: 'https://instance.atlassian.net/wiki/spaces/PROJ/pages/123456',
       };
 
@@ -30,10 +32,12 @@ describe('confluenceToMarkdownConverter', () => {
       expect(result).toContain('pageId: "123456"');
       expect(result).toContain('spaceKey: PROJ');
       expect(result).toContain('title: Page Title');
+      expect(result).toContain('status: current');
       expect(result).toContain('version: 5');
       expect(result).toContain('lastModified: 2024-01-15T10:30:00Z');
       expect(result).toContain('author: john.doe@example.com');
       expect(result).toContain('parentId: "789012"');
+      expect(result).toContain('parentType: page');
       expect(result).toContain('url: https://instance.atlassian.net/wiki/spaces/PROJ/pages/123456');
       expect(result).toContain('# Test Content');
     });
@@ -51,8 +55,10 @@ describe('confluenceToMarkdownConverter', () => {
       const result = converter.addFrontmatter(content, metadata);
 
       expect(result).toContain('pageId: "123456"');
+      expect(result).toContain('status: null');
       expect(result).toContain('author: null');
       expect(result).toContain('parentId: null');
+      expect(result).toContain('parentType: null');
       expect(result).toContain('url: null');
     });
 
@@ -113,10 +119,12 @@ This is the page content.`;
         pageId: 'NEW456',
         spaceKey: 'NEWPROJ',
         title: 'New Title',
+        status: 'current',
         version: 2,
         lastModified: '2024-12-15T10:30:00Z',
         author: 'new.user@example.com',
         parentId: '789',
+        parentType: 'folder',
         url: 'https://new.url/page',
       };
 

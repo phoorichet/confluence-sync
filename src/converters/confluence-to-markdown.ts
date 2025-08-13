@@ -10,10 +10,12 @@ interface PageMetadata {
   pageId: string;
   spaceKey: string;
   title: string;
+  status?: string;
   version: number;
   lastModified: string;
   author?: string;
   parentId?: string;
+  parentType?: string;
   url?: string;
 }
 
@@ -106,10 +108,12 @@ export class ConfluenceToMarkdownConverter {
           pageId: String(metadata.pageId),
           spaceKey: metadata.spaceKey,
           title: metadata.title,
+          status: metadata.status || null,
           version: metadata.version,
           lastModified: metadata.lastModified,
           author: metadata.author || null,
           parentId: metadata.parentId ? String(metadata.parentId) : null,
+          parentType: metadata.parentType || null,
           url: metadata.url || null,
         },
       };
