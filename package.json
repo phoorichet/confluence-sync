@@ -58,6 +58,7 @@
     "@types/minimatch": "^6.0.0",
     "@zowe/secrets-for-zowe-sdk": "^8.24.2",
     "chalk": "^5.5.0",
+    "chokidar": "^4.0.3",
     "commander": "14.0.0",
     "diff": "^8.0.2",
     "glob": "^11.0.3",
