@@ -54,14 +54,17 @@ describe('interactive Conflict Resolution', () => {
   describe('resolveConflictInteractive', () => {
     it('should handle user cancellation gracefully', async () => {
       // Setup test page
-      await manifestManager.addPage({
-        pageId: 'test-page',
+      await manifestManager.updatePage({
+        id: 'test-page',
         localPath: path.join(tempDir, 'test.md'),
         title: 'Test Page',
         spaceKey: 'TEST',
         status: 'conflicted',
         contentHash: 'hash1',
         remoteHash: 'hash2',
+        version: 1,
+        parentId: null,
+        lastModified: new Date(),
       });
 
       // Mock prompt cancellation
@@ -86,14 +89,17 @@ describe('interactive Conflict Resolution', () => {
 
     it('should show diff when requested', async () => {
       // Setup test page
-      await manifestManager.addPage({
-        pageId: 'test-page',
+      await manifestManager.updatePage({
+        id: 'test-page',
         localPath: path.join(tempDir, 'test.md'),
         title: 'Test Page',
         spaceKey: 'TEST',
         status: 'conflicted',
         contentHash: 'hash1',
         remoteHash: 'hash2',
+        version: 1,
+        parentId: null,
+        lastModified: new Date(),
       });
 
       // Mock prompts
@@ -125,14 +131,17 @@ describe('interactive Conflict Resolution', () => {
       const testFile = path.join(tempDir, 'test.md');
       await fileManager.writeFile(testFile, 'original content');
 
-      await manifestManager.addPage({
-        pageId: 'test-page',
+      await manifestManager.updatePage({
+        id: 'test-page',
         localPath: testFile,
         title: 'Test Page',
         spaceKey: 'TEST',
         status: 'conflicted',
         contentHash: 'hash1',
         remoteHash: 'hash2',
+        version: 1,
+        parentId: null,
+        lastModified: new Date(),
       });
 
       // Mock prompts for manual resolution

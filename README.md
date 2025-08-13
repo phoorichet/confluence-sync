@@ -260,8 +260,12 @@ bun run cli conflicts resolve --strategy remote-first
 #### Global Options
 
 ```bash
-# Specify a different config profile
+# Use a specific configuration profile for a single command
 bun run cli --profile production pull 123456789
+
+# Or switch profiles permanently
+bun run cli use production
+bun run cli pull 123456789  # Uses production profile
 
 # Increase verbosity for debugging
 bun run cli --verbose sync
@@ -282,26 +286,64 @@ bun run cli pull --space MYSPACE --rate-limit 100
 
 ## Configuration
 
-The tool stores configuration and sync state in `.confluence-sync.json` in your project root:
+The tool uses separate files for configuration and sync state:
+
+### File Structure
+
+- `csconfig.json` - Configuration profiles and settings
+- `.csmanifest.json` - Sync state and page metadata (hidden file)
+- `.csprofile` - Active profile marker (hidden file)
+
+### Configuration File (`csconfig.json`)
+
+Stores authentication profiles and settings:
 
 ```json
 {
-  "version": "2.0.0",
-  "confluenceUrl": "https://mycompany.atlassian.net/wiki/api/v2",
-  "lastSyncTime": "2025-01-09T10:30:00Z",
-  "syncMode": "manual",
-  "pages": [], // Tracked pages with metadata
-  "spaces": [], // Space information
-  "folders": [], // Folder hierarchy
-  "config": {
-    "profile": "default",
-    "includePatterns": ["**/*.md"],
-    "excludePatterns": [],
-    "concurrentOperations": 5,
-    "conflictStrategy": "manual",
-    "cacheEnabled": true
+  "version": "1.0.0",
+  "defaultProfile": "default",
+  "profiles": {
+    "default": {
+      "confluenceUrl": "https://mycompany.atlassian.net/wiki/api/v2",
+      "spaceKey": "MYSPACE",
+      "authType": "token",
+      "concurrentOperations": 5,
+      "conflictStrategy": "manual",
+      "includePatterns": ["**/*.md"],
+      "excludePatterns": ["**/node_modules/**", "**/.git/**"],
+      "cacheEnabled": true
+    }
+  },
+  "shared": {
+    "logLevel": "info",
+    "retryAttempts": 3,
+    "retryDelay": 1000
   }
 }
+```
+
+### Managing Profiles
+
+```bash
+# List all configuration profiles
+bun run cli config list-profiles
+
+# View current configuration
+bun run cli config view
+
+# Create a new profile
+bun run cli config create-profile staging --url https://staging.atlassian.net --space STAGE
+
+# Switch between profiles
+bun run cli use staging
+bun run cli use default
+
+# Delete a profile
+bun run cli config delete-profile staging --force
+
+# Get/set configuration values
+bun run cli config get spaceKey
+bun run cli config set concurrentOperations 10
 ```
 
 ### Ignore Patterns
@@ -332,11 +374,26 @@ drafts/
 
 ## Manifest File
 
-The tool maintains a `.confluence-sync.json` manifest that tracks:
+The tool maintains a `.csmanifest.json` file that tracks:
 - Page mappings between local files and Confluence IDs
 - Version numbers for conflict detection
 - Content hashes for change detection
 - Space metadata and hierarchy information
+- Sync operations history
+
+The manifest file is automatically managed by the tool and contains:
+```json
+{
+  "version": "1.0.0",
+  "confluenceUrl": "https://mycompany.atlassian.net/wiki/api/v2",
+  "lastSyncTime": "2025-01-09T10:30:00Z",
+  "syncMode": "manual",
+  "pages": {}, // Tracked pages with metadata
+  "spaces": {}, // Space information
+  "folders": {}, // Folder hierarchy
+  "operations": [] // Sync history
+}
+```
 
 **Note**: This file should be committed to version control to maintain sync state across team members.
 
@@ -346,13 +403,16 @@ The tool maintains a `.confluence-sync.json` manifest that tracks:
 |---------|-------------|
 | `auth` | Manage authentication (login/logout/status) |
 | `completion` | Generate shell completion scripts |
+| `config` | Manage configuration profiles and settings |
 | `conflicts` | Manage and resolve sync conflicts |
 | `health` | Check system health and connectivity |
 | `init` | Initialize sync configuration |
 | `pull` | Pull pages from Confluence |
 | `push` | Push files to Confluence |
+| `search` | Search for Confluence pages |
 | `status` | Show sync status |
 | `sync` | Bidirectional synchronization |
+| `use` | Switch between configuration profiles |
 | `watch` | Watch for changes and sync automatically |
 
 ## Error Codes

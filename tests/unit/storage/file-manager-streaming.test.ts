@@ -1,11 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FileManager } from '../../../src/storage/file-manager';
 
-describe('FileManager Streaming Operations', () => {
+describe('fileManager Streaming Operations', () => {
   const fileManager = FileManager.getInstance();
-  const testDir = path.join(import.meta.dir, 'test-streaming');
+  const testDir = path.join(__dirname, 'test-streaming');
   const largeFilePath = path.join(testDir, 'large-file.txt');
   const smallFilePath = path.join(testDir, 'small-file.txt');
 
@@ -29,6 +29,9 @@ describe('FileManager Streaming Operations', () => {
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true });
     }
+    
+    // Clear singleton instance for clean state
+    FileManager.clearInstance();
   });
 
   describe('isLargeFile', () => {
@@ -75,11 +78,12 @@ describe('FileManager Streaming Operations', () => {
     });
 
     it('should throw error for non-existent file', async () => {
-      expect(async () => {
-        for await (const _chunk of fileManager.readFileStream('/non/existent/file.txt')) {
-          // Should not reach here
-        }
-      }).toThrow('CS-404');
+      // The async generator throws when iteration starts
+      await expect(async () => {
+        const iterator = fileManager.readFileStream('/non/existent/file.txt');
+        // Force the generator to start and throw
+        await iterator.next();
+      }).rejects.toThrow('CS-404');
     });
   });
 
@@ -88,7 +92,14 @@ describe('FileManager Streaming Operations', () => {
       const outputPath = path.join(testDir, 'output.txt');
       const chunks = ['Hello', ' ', 'World', '!'];
 
-      await fileManager.writeFileStream(outputPath, chunks[Symbol.iterator]());
+      // Convert array to async iterator
+      async function* makeAsyncIterator(array: string[]) {
+        for (const item of array) {
+          yield item;
+        }
+      }
+
+      await fileManager.writeFileStream(outputPath, makeAsyncIterator(chunks));
 
       const content = readFileSync(outputPath, 'utf-8');
       expect(content).toBe('Hello World!');
@@ -121,7 +132,14 @@ describe('FileManager Streaming Operations', () => {
       const outputPath = path.join(testDir, 'new-dir', 'output.txt');
       const chunks = ['Test'];
 
-      await fileManager.writeFileStream(outputPath, chunks[Symbol.iterator]());
+      // Convert array to async iterator
+      async function* makeAsyncIterator(array: string[]) {
+        for (const item of array) {
+          yield item;
+        }
+      }
+
+      await fileManager.writeFileStream(outputPath, makeAsyncIterator(chunks));
 
       expect(existsSync(outputPath)).toBe(true);
       expect(readFileSync(outputPath, 'utf-8')).toBe('Test');
@@ -147,7 +165,7 @@ describe('FileManager Streaming Operations', () => {
       const memAfter = fileManager.getMemoryUsage();
 
       // Memory usage should not increase significantly (< 50MB)
-      expect(memAfter.heapUsed - memBefore.heapUsed).toBeLessThan(50);
+      expect(memAfter.heapUsed - memBefore.heapUsed).toBeLessThan(50 * 1024 * 1024);
 
       // Verify file was copied
       expect(existsSync(destPath)).toBe(true);
@@ -155,7 +173,8 @@ describe('FileManager Streaming Operations', () => {
     });
 
     it('should throw error for non-existent source', async () => {
-      expect(fileManager.copyFileStream('/non/existent.txt', '/dest.txt')).rejects.toThrow('CS-404');
+      // Add await to properly handle the promise
+      await expect(fileManager.copyFileStream('/non/existent.txt', '/dest.txt')).rejects.toThrow('CS-404');
     });
   });
 
@@ -177,8 +196,8 @@ describe('FileManager Streaming Operations', () => {
 
       const memAfter = fileManager.getMemoryUsage();
 
-      // Memory usage should not increase significantly
-      expect(memAfter.heapUsed - memBefore.heapUsed).toBeLessThan(50);
+      // Memory usage should not increase significantly (< 50MB)
+      expect(memAfter.heapUsed - memBefore.heapUsed).toBeLessThan(50 * 1024 * 1024);
 
       // Hash should be consistent
       expect(hash).toHaveLength(64); // SHA-256 produces 64 hex characters
@@ -198,7 +217,7 @@ describe('FileManager Streaming Operations', () => {
 
       // Should return an async iterator for large files
       expect(typeof result).toBe('object');
-      expect(result[Symbol.asyncIterator]).toBeDefined();
+      expect((result as any)[Symbol.asyncIterator]).toBeDefined();
 
       // Verify we can read from it
       const chunks: string[] = [];
@@ -215,7 +234,7 @@ describe('FileManager Streaming Operations', () => {
 
       // Should use streaming since file is larger than 10 bytes
       expect(typeof result).toBe('object');
-      expect(result[Symbol.asyncIterator]).toBeDefined();
+      expect((result as any)[Symbol.asyncIterator]).toBeDefined();
     });
   });
 
@@ -235,8 +254,8 @@ describe('FileManager Streaming Operations', () => {
       await fileManager.smartWrite(outputPath, largeContent);
       const memAfter = fileManager.getMemoryUsage();
 
-      // Memory usage should be reasonable
-      expect(memAfter.heapUsed - memBefore.heapUsed).toBeLessThan(100);
+      // Memory usage should be reasonable (< 100MB increase)
+      expect(memAfter.heapUsed - memBefore.heapUsed).toBeLessThan(100 * 1024 * 1024);
 
       // File should be written correctly
       expect(existsSync(outputPath)).toBe(true);

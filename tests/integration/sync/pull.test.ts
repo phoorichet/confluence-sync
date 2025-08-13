@@ -5,11 +5,7 @@ import { Command } from 'commander';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AuthManager } from '../../../src/auth/auth-manager';
 import { pullCommand } from '../../../src/commands/pull';
-
-// Mock AuthManager
-vi.mock('../../../src/auth/auth-manager');
 
 // Create MSW server for mocking Confluence API
 const server = setupServer();
@@ -29,7 +25,8 @@ describe('pull Command Integration', () => {
     // Setup MSW server
     server.listen({ onUnhandledRequest: 'error' });
 
-    // Mock AuthManager
+    // Mock AuthManager manually
+    const AuthManager = await import('../../../src/auth/auth-manager').then(m => m.AuthManager);
     mockAuthManager = {
       getStoredCredentials: vi.fn().mockResolvedValue({
         url: 'https://test.atlassian.net/wiki/api/v2',
@@ -38,7 +35,7 @@ describe('pull Command Integration', () => {
       }),
       getToken: vi.fn().mockResolvedValue('Basic dGVzdEBleGFtcGxlLmNvbTp0ZXN0LXRva2Vu'),
     };
-    vi.mocked(AuthManager.getInstance).mockReturnValue(mockAuthManager);
+    vi.spyOn(AuthManager, 'getInstance').mockReturnValue(mockAuthManager);
 
     // Setup Commander program
     program = new Command();

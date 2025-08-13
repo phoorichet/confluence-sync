@@ -3,20 +3,18 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import process from 'node:process';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createUseCommand } from '../../../src/commands/use.ts';
+import { useCommand } from '../../../src/commands/use.ts';
 import { ConfigManager } from '../../../src/config/config-manager.ts';
-
-// Import logger after mock
 import { logger } from '../../../src/utils/logger.ts';
 
 // Mock logger
-vi.mock('../../../src/utils/logger.ts', () => ({
+vi.mock('../../../src/utils/logger', () => ({
   logger: {
-    debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
     success: vi.fn(),
+    debug: vi.fn(),
   },
 }));
 
@@ -78,7 +76,7 @@ describe('use Command', () => {
 
     // Create temporary test directory
     testDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'confluence-sync-test-'));
-    configPath = path.join(testDir, '.confluence-sync.json');
+    configPath = path.join(testDir, 'csconfig.json');
 
     // Write mock config
     await fs.promises.writeFile(configPath, JSON.stringify(mockConfig, null, 2));
@@ -109,18 +107,18 @@ describe('use Command', () => {
 
   describe('profile switching', () => {
     it('should switch to valid profile', async () => {
-      const command = createUseCommand();
+      const command = useCommand;
 
       await command.parseAsync(['node', 'use', 'staging']);
 
-      expect(vi.mocked(logger.success)).toHaveBeenCalledWith('Switched to profile \'staging\'');
-      expect(vi.mocked(logger.info)).toHaveBeenCalledWith('  Confluence URL: https://staging.atlassian.net');
-      expect(vi.mocked(logger.info)).toHaveBeenCalledWith('  Space Key: STAGE');
-      expect(vi.mocked(logger.info)).toHaveBeenCalledWith('  Auth Type: oauth');
+      expect(logger.success)).toHaveBeenCalledWith('Switched to profile \'staging\'');
+      expect(logger.info)).toHaveBeenCalledWith('  Confluence URL: https://staging.atlassian.net');
+      expect(logger.info)).toHaveBeenCalledWith('  Space Key: STAGE');
+      expect(logger.info)).toHaveBeenCalledWith('  Auth Type: oauth');
     });
 
     it('should handle non-existent profile', async () => {
-      const command = createUseCommand();
+      const command = useCommand;
 
       try {
         await command.parseAsync(['node', 'use', 'nonexistent']);
@@ -129,37 +127,37 @@ describe('use Command', () => {
         // Expected to throw due to process.exit mock
       }
 
-      expect(vi.mocked(logger.error)).toHaveBeenCalledWith('Profile \'nonexistent\' not found');
-      expect(vi.mocked(logger.info)).toHaveBeenCalledWith('Available profiles:');
-      expect(vi.mocked(logger.info)).toHaveBeenCalledWith('  - production');
-      expect(vi.mocked(logger.info)).toHaveBeenCalledWith('  - staging');
-      expect(vi.mocked(logger.info)).toHaveBeenCalledWith('  - development');
+      expect(logger.error)).toHaveBeenCalledWith('Profile \'nonexistent\' not found');
+      expect(logger.info)).toHaveBeenCalledWith('Available profiles:');
+      expect(logger.info)).toHaveBeenCalledWith('  - production');
+      expect(logger.info)).toHaveBeenCalledWith('  - staging');
+      expect(logger.info)).toHaveBeenCalledWith('  - development');
       expect(exitCode).toBe(1);
     });
   });
 
   describe('list profiles', () => {
     it('should list all available profiles', async () => {
-      const command = createUseCommand();
+      const command = useCommand;
 
       await command.parseAsync(['node', 'use', 'dummy', '--list']);
 
-      expect(vi.mocked(logger.info)).toHaveBeenCalledWith('Available profiles:');
-      expect(vi.mocked(logger.info)).toHaveBeenCalledWith('  - production (active)');
-      expect(vi.mocked(logger.info)).toHaveBeenCalledWith('  - staging');
-      expect(vi.mocked(logger.info)).toHaveBeenCalledWith('  - development');
+      expect(logger.info)).toHaveBeenCalledWith('Available profiles:');
+      expect(logger.info)).toHaveBeenCalledWith('  - production (active)');
+      expect(logger.info)).toHaveBeenCalledWith('  - staging');
+      expect(logger.info)).toHaveBeenCalledWith('  - development');
     });
 
     it('should mark active profile in list', async () => {
       const configManager = ConfigManager.getInstance();
       await configManager.switchProfile('staging');
 
-      const command = createUseCommand();
+      const command = useCommand;
       await command.parseAsync(['node', 'use', 'dummy', '--list']);
 
-      expect(vi.mocked(logger.info)).toHaveBeenCalledWith('  - production');
-      expect(vi.mocked(logger.info)).toHaveBeenCalledWith('  - staging (active)');
-      expect(vi.mocked(logger.info)).toHaveBeenCalledWith('  - development');
+      expect(logger.info)).toHaveBeenCalledWith('  - production');
+      expect(logger.info)).toHaveBeenCalledWith('  - staging (active)');
+      expect(logger.info)).toHaveBeenCalledWith('  - development');
     });
 
     it('should handle empty profile list', async () => {
@@ -173,10 +171,10 @@ describe('use Command', () => {
       // Reset singleton to pick up new config
       (ConfigManager as any).instance = undefined;
 
-      const command = createUseCommand();
+      const command = useCommand;
       await command.parseAsync(['node', 'use', 'dummy', '--list']);
 
-      expect(vi.mocked(logger.warn)).toHaveBeenCalledWith('No profiles found in configuration');
+      expect(logger.warn)).toHaveBeenCalledWith('No profiles found in configuration');
     });
   });
 
@@ -189,7 +187,7 @@ describe('use Command', () => {
       // Reset singleton
       (ConfigManager as any).instance = undefined;
 
-      const command = createUseCommand();
+      const command = useCommand;
 
       try {
         await command.parseAsync(['node', 'use', 'staging']);
@@ -198,7 +196,7 @@ describe('use Command', () => {
         // Expected to throw due to process.exit mock
       }
 
-      expect(vi.mocked(logger.error)).toHaveBeenCalledWith(
+      expect(logger.error)).toHaveBeenCalledWith(
         'No configuration file found. Run \'confluence-sync init\' to create one.',
       );
       expect(exitCode).toBe(1);
@@ -214,7 +212,7 @@ describe('use Command', () => {
       // Reset singleton
       (ConfigManager as any).instance = undefined;
 
-      const command = createUseCommand();
+      const command = useCommand;
 
       try {
         await command.parseAsync(['node', 'use', 'staging']);
@@ -223,7 +221,7 @@ describe('use Command', () => {
         // Expected to throw due to process.exit mock
       }
 
-      expect(vi.mocked(logger.error)).toHaveBeenCalled();
+      expect(logger.error)).toHaveBeenCalled();
       expect(exitCode).toBe(1);
     });
   });

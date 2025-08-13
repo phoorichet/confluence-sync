@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { calculateFileHash, calculateStringHash, getShortHash, hashesMatch } from '../../../src/utils/hash';
 
 describe('Hash Utilities', () => {
@@ -53,7 +53,7 @@ describe('Hash Utilities', () => {
   });
 
   describe('calculateFileHash', () => {
-    const testDir = path.join(import.meta.dir, 'test-files');
+    const testDir = path.join(__dirname, 'test-files');
     const testFile = path.join(testDir, 'test.txt');
 
     beforeEach(() => {

@@ -261,6 +261,65 @@ export class ConfluenceAPIClient {
     }, { timeout: 300000 }); // 5min timeout for bulk operations
   }
 
+  public async searchContent(options: {
+    cql: string;
+    limit?: number;
+    start?: number;
+    expand?: string[];
+  }): Promise<any> {
+    return this.executeWithProtection(async () => {
+      // Use the content/search endpoint which should work with proper permissions
+      let searchUrl: string;
+      if (this.baseUrl.includes('.atlassian.net')) {
+        // For Cloud instances, use content/search endpoint
+        searchUrl = `${this.baseUrl.replace('/wiki/api/v2', '/wiki/rest/api')}/content/search`;
+      }
+      else {
+        // For Server instances
+        searchUrl = `${this.baseUrl.replace('/api/v2', '/rest/api')}/content/search`;
+      }
+
+      const params = new URLSearchParams();
+      params.append('cql', options.cql);
+      params.append('limit', String(options.limit || 25));
+      params.append('start', String(options.start || 0));
+
+      if (options.expand && options.expand.length > 0) {
+        params.append('expand', options.expand.join(','));
+      }
+
+      const credentials = await this.authManager.getStoredCredentials();
+      if (!credentials) {
+        throw new Error('CS-401: No authentication credentials available');
+      }
+
+      const fullUrl = `${searchUrl}?${params}`;
+      logger.debug(`Search URL: ${fullUrl}`);
+
+      const response = await fetch(fullUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Basic ${btoa(`${credentials.username}:${credentials.apiToken}`)}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        logger.error(`Search failed - Status: ${response.status}, URL: ${fullUrl}`);
+        logger.error('Error response:', errorData);
+        throw new Error(`CS-1001: Search failed: ${(errorData as any)?.message || response.statusText}`);
+      }
+
+      return await response.json();
+    }, { timeout: 30000 });
+  }
+
+  public getBaseUrl(): string {
+    return this.baseUrl.replace('/api/v2', '');
+  }
+
   public async createPage(spaceId: string, title: string, body: string, parentId?: string): Promise<PageSingle> {
     return this.executeWithProtection(async () => {
       const requestBody: any = {
@@ -649,3 +708,4 @@ export class ConfluenceAPIClient {
 
 // Export singleton instance
 export const apiClient = ConfluenceAPIClient.getInstance();
+export const ApiClient = ConfluenceAPIClient;

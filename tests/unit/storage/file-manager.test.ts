@@ -4,83 +4,93 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FileManager } from '../../../src/storage/file-manager';
 
+// Mock fs module
+vi.mock('node:fs', () => ({
+  existsSync: vi.fn(),
+  mkdirSync: vi.fn(),
+  writeFileSync: vi.fn(),
+  readFileSync: vi.fn(),
+  rmSync: vi.fn(),
+  statSync: vi.fn(),
+  createReadStream: vi.fn(),
+  createWriteStream: vi.fn(),
+}));
+
+// Mock logger
+vi.mock('../../../src/utils/logger', () => ({
+  logger: {
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
 describe('fileManager', () => {
   let fileManager: FileManager;
 
   beforeEach(() => {
-    fileManager = new FileManager();
     vi.clearAllMocks();
+    // Clear singleton instance
+    (FileManager as any).instance = undefined;
+    fileManager = FileManager.getInstance();
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
+    // Clear singleton instance
+    (FileManager as any).instance = undefined;
   });
 
   describe('writeFile', () => {
     it('should write a file successfully', async () => {
       // Arrange
-      const outputDir = '/test/dir';
-      const filename = 'test-file';
+      const filePath = '/test/dir/test-file.md';
       const content = 'Test content';
-      const expectedPath = path.join(path.resolve(outputDir), `${filename}.md`);
+      const expectedPath = path.resolve(filePath);
 
-      vi.spyOn(fs, 'existsSync').mockReturnValue(false);
-      vi.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
-      vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+      (fs.existsSync as any).mockReturnValue(false);
+      (fs.mkdirSync as any).mockImplementation(() => undefined);
+      (fs.writeFileSync as any).mockImplementation(() => {});
 
       // Act
-      const result = await fileManager.writeFile(outputDir, filename, content);
+      const result = await fileManager.writeFile(filePath, content);
 
       // Assert
       expect(result).toBe(expectedPath);
-      expect(fs.mkdirSync).toHaveBeenCalledWith(path.resolve(outputDir), { recursive: true });
+      expect(fs.mkdirSync).toHaveBeenCalledWith(path.dirname(expectedPath), { recursive: true });
       expect(fs.writeFileSync).toHaveBeenCalledWith(expectedPath, content, 'utf-8');
     });
 
-    it('should create backup if file exists', async () => {
+    it('should not create directory if it exists', async () => {
       // Arrange
-      const outputDir = '/test/dir';
-      const filename = 'existing-file';
+      const filePath = '/test/dir/existing-file.md';
       const content = 'New content';
-      const oldContent = 'Old content';
 
-      vi.spyOn(fs, 'existsSync').mockImplementation((path) => {
-        return path.toString().endsWith('.md');
-      });
-      vi.spyOn(fs, 'readFileSync').mockReturnValue(oldContent);
-      vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
-
-      // Mock Date for consistent backup filename
-      const mockDate = new Date('2024-01-15T10:30:00Z');
-      vi.spyOn(globalThis, 'Date').mockImplementation(() => mockDate as any);
+      (fs.existsSync as any).mockReturnValue(true);
+      (fs.writeFileSync as any).mockImplementation(() => {});
 
       // Act
-      await fileManager.writeFile(outputDir, filename, content);
+      await fileManager.writeFile(filePath, content);
 
       // Assert
-      expect(fs.readFileSync).toHaveBeenCalled();
-      expect(fs.writeFileSync).toHaveBeenCalledTimes(2); // Once for backup, once for new file
-      expect(fs.writeFileSync).toHaveBeenCalledWith(
-        expect.stringContaining('backup'),
-        oldContent,
-        'utf-8',
-      );
+      expect(fs.mkdirSync).not.toHaveBeenCalled();
+      expect(fs.writeFileSync).toHaveBeenCalled();
     });
 
     it('should handle write errors', async () => {
       // Arrange
-      const outputDir = '/test/dir';
-      const filename = 'test-file';
+      const filePath = '/test/dir/test-file.md';
       const content = 'Test content';
 
-      vi.spyOn(fs, 'existsSync').mockReturnValue(false);
-      vi.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
-      vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {
+      (fs.existsSync as any).mockReturnValue(false);
+      (fs.mkdirSync as any).mockImplementation(() => undefined);
+      (fs.writeFileSync as any).mockImplementation(() => {
         throw new Error('Write failed');
       });
 
       // Act & Assert
-      await expect(fileManager.writeFile(outputDir, filename, content))
+      await expect(fileManager.writeFile(filePath, content))
         .rejects
         .toThrow('CS-502: Failed to write file: Write failed');
     });
@@ -173,15 +183,17 @@ describe('fileManager', () => {
       const backupPath = '/test/file.backup.md';
       const content = 'File content';
 
-      vi.spyOn(fs, 'readFileSync').mockReturnValue(content);
-      vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+      (fs.readFileSync as any).mockReturnValue(content);
+      (fs.existsSync as any).mockReturnValue(false);
+      (fs.mkdirSync as any).mockImplementation(() => {});
+      (fs.writeFileSync as any).mockImplementation(() => {});
 
       // Act
       await fileManager.createBackup(originalPath, backupPath);
 
       // Assert
       expect(fs.readFileSync).toHaveBeenCalledWith(originalPath, 'utf-8');
-      expect(fs.writeFileSync).toHaveBeenCalledWith(backupPath, content, 'utf-8');
+      expect(fs.writeFileSync).toHaveBeenCalledWith(path.resolve(backupPath), content, 'utf-8');
     });
 
     it('should handle backup errors', async () => {
@@ -189,7 +201,7 @@ describe('fileManager', () => {
       const originalPath = '/test/file.md';
       const backupPath = '/test/file.backup.md';
 
-      vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
+      (fs.readFileSync as any).mockImplementation(() => {
         throw new Error('Read failed');
       });
 
@@ -206,8 +218,8 @@ describe('fileManager', () => {
       const filePath = '/test/file.md';
       const content = 'File content';
 
-      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-      vi.spyOn(fs, 'readFileSync').mockReturnValue(content);
+      (fs.existsSync as any).mockReturnValue(true);
+      (fs.readFileSync as any).mockReturnValue(content);
 
       // Act
       const result = await fileManager.readFile(filePath);
@@ -221,7 +233,7 @@ describe('fileManager', () => {
       // Arrange
       const filePath = '/test/nonexistent.md';
 
-      vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+      (fs.existsSync as any).mockReturnValue(false);
 
       // Act & Assert
       await expect(fileManager.readFile(filePath))
@@ -233,8 +245,8 @@ describe('fileManager', () => {
       // Arrange
       const filePath = '/test/file.md';
 
-      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-      vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
+      (fs.existsSync as any).mockReturnValue(true);
+      (fs.readFileSync as any).mockImplementation(() => {
         throw new Error('Permission denied');
       });
 
@@ -242,6 +254,70 @@ describe('fileManager', () => {
       await expect(fileManager.readFile(filePath))
         .rejects
         .toThrow('CS-502: Failed to read file: Permission denied');
+    });
+  });
+
+  describe('writeFileWithDir (deprecated)', () => {
+    it('should write file using deprecated method', async () => {
+      const outputDir = '/test/dir';
+      const filename = 'test-file';
+      const content = 'Test content';
+      const expectedPath = path.join(path.resolve(outputDir), `${filename}.md`);
+
+      (fs.existsSync as any).mockImplementation((_p: string) => {
+        // Directory doesn't exist, file doesn't exist
+        return false;
+      });
+      (fs.mkdirSync as any).mockImplementation(() => undefined);
+      (fs.writeFileSync as any).mockImplementation(() => {});
+
+      const result = await fileManager.writeFileWithDir(outputDir, filename, content);
+
+      expect(result).toBe(expectedPath);
+      expect(fs.mkdirSync).toHaveBeenCalledWith(path.resolve(outputDir), { recursive: true });
+      expect(fs.writeFileSync).toHaveBeenCalledWith(expectedPath, content, 'utf-8');
+    });
+
+    it('should create backup with deprecated method if file exists', async () => {
+      const outputDir = '/test/dir';
+      const filename = 'existing-file';
+      const content = 'New content';
+      const oldContent = 'Old content';
+
+      (fs.existsSync as any).mockImplementation((_p: string) => {
+        return _p.toString().endsWith('.md');
+      });
+      (fs.readFileSync as any).mockReturnValue(oldContent);
+      (fs.writeFileSync as any).mockImplementation(() => {});
+
+      // Mock Date for consistent backup filename
+      const mockDate = new Date('2024-01-15T10:30:00Z');
+      vi.spyOn(globalThis, 'Date').mockImplementation(() => mockDate as any);
+
+      await fileManager.writeFileWithDir(outputDir, filename, content);
+
+      expect(fs.readFileSync).toHaveBeenCalled();
+      expect(fs.writeFileSync).toHaveBeenCalledTimes(2); // Once for backup, once for new file
+      expect(fs.writeFileSync).toHaveBeenCalledWith(
+        expect.stringContaining('backup'),
+        oldContent,
+        'utf-8',
+      );
+    });
+  });
+
+  describe('singleton pattern', () => {
+    it('should return the same instance', () => {
+      const instance1 = FileManager.getInstance();
+      const instance2 = FileManager.getInstance();
+      expect(instance1).toBe(instance2);
+    });
+
+    it('should create new instance after clearing', () => {
+      const instance1 = FileManager.getInstance();
+      (FileManager as any).instance = undefined;
+      const instance2 = FileManager.getInstance();
+      expect(instance1).not.toBe(instance2);
     });
   });
 });

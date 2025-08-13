@@ -4,7 +4,6 @@ import { ConfluenceAPIClient } from '../../../src/api/client';
 import { AuthManager } from '../../../src/auth/auth-manager';
 
 // Mock AuthManager
-vi.mock('../../../src/auth/auth-manager');
 
 describe('basic API Client Tests', () => {
   let client: ConfluenceAPIClient;
@@ -22,7 +21,7 @@ describe('basic API Client Tests', () => {
       getToken: vi.fn().mockResolvedValue('Basic dGVzdEBleGFtcGxlLmNvbTp0ZXN0LXRva2Vu'),
     };
 
-    vi.mocked(AuthManager.getInstance).mockReturnValue(mockAuthManager);
+    vi.spyOn(AuthManager, 'getInstance').mockReturnValue(mockAuthManager);
 
     client = new ConfluenceAPIClient();
   });

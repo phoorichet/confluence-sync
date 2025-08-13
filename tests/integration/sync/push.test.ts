@@ -1,7 +1,7 @@
 import type { SyncManifest } from '../../../src/storage/manifest-manager';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 

@@ -4,15 +4,16 @@ import process from 'node:process';
 import { Command } from 'commander';
 import { authCommand } from './commands/auth.js';
 import { completionCommand } from './commands/completion.js';
-// import { configCommand } from './commands/config.js';
+import { configCommand } from './commands/config.js';
 import { conflictsCommand } from './commands/conflicts.js';
 import { healthCommand } from './commands/health.js';
 import { initCommand } from './commands/init.js';
 import { pullCommand } from './commands/pull.js';
 import { pushCommand } from './commands/push.js';
+import { searchCommand } from './commands/search.js';
 import { statusCommand } from './commands/status.js';
 import { syncCommand } from './commands/sync.js';
-// import { useCommand } from './commands/use.js';
+import { useCommand } from './commands/use.js';
 import { watchCommand } from './commands/watch.js';
 import { getPackageInfo } from './utils/package-info.js';
 
@@ -30,15 +31,16 @@ program
 // Register commands
 program.addCommand(authCommand);
 program.addCommand(completionCommand);
-// program.addCommand(configCommand);
+program.addCommand(configCommand);
 program.addCommand(conflictsCommand);
 program.addCommand(healthCommand);
 program.addCommand(initCommand);
 program.addCommand(pullCommand);
 program.addCommand(pushCommand);
+program.addCommand(searchCommand);
 program.addCommand(statusCommand);
 program.addCommand(syncCommand);
-// program.addCommand(useCommand);
+program.addCommand(useCommand);
 program.addCommand(watchCommand);
 
 // Parse command line arguments

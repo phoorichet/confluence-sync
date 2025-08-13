@@ -7,7 +7,13 @@ export const formatOptionsSchema = z.object({
   preserveLinks: z.boolean().default(true),
   preserveImages: z.boolean().default(true),
   preserveMacros: z.boolean().default(false),
-}).default({});
+}).default(() => ({
+  preserveTables: true,
+  preserveCodeBlocks: true,
+  preserveLinks: true,
+  preserveImages: true,
+  preserveMacros: false,
+}));
 
 // Individual profile configuration
 export const profileConfigSchema = z.object({
@@ -103,7 +109,7 @@ export class ConfigError extends Error {
     this.name = 'ConfigError';
     this.code = code;
     this.details = details;
-    
+
     // Ensures proper prototype chain for instanceof checks
     Object.setPrototypeOf(this, ConfigError.prototype);
   }

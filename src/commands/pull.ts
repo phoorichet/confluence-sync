@@ -75,7 +75,7 @@ export const pullCommand = new Command('pull')
   });
 
 // Helper function to pull a single page
-async function pullSinglePage(pageId: string, outputDir: string, progress: any): Promise<void> {
+export async function pullSinglePage(pageId: string, outputDir: string, progress: any): Promise<void> {
   // Fetch page from Confluence
   progress.update('Fetching page from Confluence...');
   const page = await apiClient.getPage(pageId, true);

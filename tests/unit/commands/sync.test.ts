@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Command } from 'commander';
 import { syncCommand } from '../../../src/commands/sync';
 import { SyncEngine } from '../../../src/sync/engine';
@@ -19,15 +19,15 @@ describe('syncCommand', () => {
     program.addCommand(syncCommand);
 
     // Mock console and process
-    consoleLogSpy = spyOn(console, 'log').mockImplementation(() => {});
-    consoleErrorSpy = spyOn(console, 'error').mockImplementation(() => {});
-    processExitSpy = spyOn(process, 'exit').mockImplementation(() => {
+    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('Process exit');
     });
 
     // Mock logger
-    spyOn(logger, 'error').mockImplementation(() => {});
-    spyOn(logger, 'info').mockImplementation(() => {});
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
+    vi.spyOn(logger, 'info').mockImplementation(() => {});
   });
 
   it('should execute sync with default options', async () => {
@@ -48,7 +48,7 @@ describe('syncCommand', () => {
       errors: [],
     };
 
-    const syncSpy = spyOn(SyncEngine.prototype, 'sync').mockResolvedValue(mockResult);
+    const syncSpy = vi.spyOn(SyncEngine.prototype, 'sync').mockResolvedValue(mockResult);
 
     await program.parseAsync(['node', 'test', 'sync']);
 
@@ -82,7 +82,7 @@ describe('syncCommand', () => {
       errors: [],
     };
 
-    const syncSpy = spyOn(SyncEngine.prototype, 'sync').mockResolvedValue(mockResult);
+    const syncSpy = vi.spyOn(SyncEngine.prototype, 'sync').mockResolvedValue(mockResult);
 
     await program.parseAsync(['node', 'test', 'sync', '--dry-run']);
 
@@ -113,7 +113,7 @@ describe('syncCommand', () => {
       errors: [],
     };
 
-    const syncSpy = spyOn(SyncEngine.prototype, 'sync').mockResolvedValue(mockResult);
+    const syncSpy = vi.spyOn(SyncEngine.prototype, 'sync').mockResolvedValue(mockResult);
 
     await program.parseAsync(['node', 'test', 'sync', '--max-concurrent', '10']);
 
@@ -142,7 +142,7 @@ describe('syncCommand', () => {
       errors: [],
     };
 
-    spyOn(SyncEngine.prototype, 'sync').mockResolvedValue(mockResult);
+    vi.spyOn(SyncEngine.prototype, 'sync').mockResolvedValue(mockResult);
 
     await program.parseAsync(['node', 'test', 'sync']);
 
@@ -170,7 +170,7 @@ describe('syncCommand', () => {
       errors: [new Error('Test error 1'), new Error('Test error 2')],
     };
 
-    spyOn(SyncEngine.prototype, 'sync').mockResolvedValue(mockResult);
+    vi.spyOn(SyncEngine.prototype, 'sync').mockResolvedValue(mockResult);
 
     try {
       await program.parseAsync(['node', 'test', 'sync']);
@@ -187,7 +187,7 @@ describe('syncCommand', () => {
 
   it('should handle sync failure', async () => {
     const error = new Error('Sync failed');
-    spyOn(SyncEngine.prototype, 'sync').mockRejectedValue(error);
+    vi.spyOn(SyncEngine.prototype, 'sync').mockRejectedValue(error);
 
     try {
       await program.parseAsync(['node', 'test', 'sync']);
@@ -219,7 +219,7 @@ describe('syncCommand', () => {
       errors: [],
     };
 
-    const syncSpy = spyOn(SyncEngine.prototype, 'sync').mockResolvedValue(mockResult);
+    const syncSpy = vi.spyOn(SyncEngine.prototype, 'sync').mockResolvedValue(mockResult);
 
     await program.parseAsync(['node', 'test', 'sync', '--verbose']);
 

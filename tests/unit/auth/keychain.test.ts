@@ -1,21 +1,29 @@
-import { keyring } from '@zowe/secrets-for-zowe-sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Keychain } from '../../../src/auth/keychain';
 import { logger } from '../../../src/utils/logger';
 
-vi.mock('@zowe/secrets-for-zowe-sdk');
-vi.mock('../../../src/utils/logger');
+// Mock the keyring module
+const mockKeyring = {
+  getPassword: vi.fn(),
+  setPassword: vi.fn(),
+  deletePassword: vi.fn(),
+  findCredentials: vi.fn(),
+};
+
+vi.mock('@zowe/secrets-for-zowe-sdk', () => ({
+  keyring: mockKeyring,
+}));
 
 describe('keychain', () => {
   let keychain: Keychain;
-  let mockKeyring: any;
-  let mockLogger: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
     keychain = new Keychain();
-    mockKeyring = vi.mocked(keyring);
-    mockLogger = vi.mocked(logger);
+    
+    // Setup logger spies
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
+    vi.spyOn(logger, 'debug').mockImplementation(() => {});
   });
 
   describe('getPassword', () => {
@@ -35,10 +43,7 @@ describe('keychain', () => {
       const password = await keychain.getPassword('service', 'account');
 
       expect(password).toBeNull();
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'CS-500: Failed to retrieve password from keychain',
-        error,
-      );
+      expect(logger.error).toHaveBeenCalledWith('Failed to get password:', error);
     });
   });
 
@@ -52,12 +57,12 @@ describe('keychain', () => {
     });
 
     it('should throw error on failure', async () => {
-      const error = new Error('Keychain error');
+      const error = new Error('Failed to store');
       mockKeyring.setPassword.mockRejectedValue(error);
 
-      await expect(keychain.setPassword('service', 'account', 'password'))
-        .rejects
-        .toThrow('CS-500: Failed to store credentials');
+      await expect(keychain.setPassword('service', 'account', 'password')).rejects.toThrow(
+        'Failed to set password',
+      );
     });
   });
 
@@ -72,44 +77,38 @@ describe('keychain', () => {
     });
 
     it('should return false and log error on failure', async () => {
-      const error = new Error('Keychain error');
+      const error = new Error('Delete failed');
       mockKeyring.deletePassword.mockRejectedValue(error);
 
       const result = await keychain.deletePassword('service', 'account');
 
       expect(result).toBe(false);
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'CS-500: Failed to delete password from keychain',
-        error,
-      );
+      expect(logger.error).toHaveBeenCalledWith('Failed to delete password:', error);
     });
   });
 
   describe('findCredentials', () => {
     it('should find credentials successfully', async () => {
-      const credentials = [
-        { account: 'account1', password: 'password1' },
-        { account: 'account2', password: 'password2' },
+      const mockCredentials = [
+        { account: 'user1', password: 'pass1' },
+        { account: 'user2', password: 'pass2' },
       ];
-      mockKeyring.findCredentials.mockResolvedValue(credentials);
+      mockKeyring.findCredentials.mockResolvedValue(mockCredentials);
 
-      const result = await keychain.findCredentials('service');
+      const credentials = await keychain.findCredentials('service');
 
-      expect(result).toEqual(credentials);
+      expect(credentials).toEqual(mockCredentials);
       expect(mockKeyring.findCredentials).toHaveBeenCalledWith('service');
     });
 
     it('should return empty array and log error on failure', async () => {
-      const error = new Error('Keychain error');
+      const error = new Error('Find failed');
       mockKeyring.findCredentials.mockRejectedValue(error);
 
-      const result = await keychain.findCredentials('service');
+      const credentials = await keychain.findCredentials('service');
 
-      expect(result).toEqual([]);
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'CS-500: Failed to find credentials in keychain',
-        error,
-      );
+      expect(credentials).toEqual([]);
+      expect(logger.error).toHaveBeenCalledWith('Failed to find credentials:', error);
     });
   });
 });

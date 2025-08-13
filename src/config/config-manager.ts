@@ -25,7 +25,7 @@ export class ConfigManager {
   private constructor() {
     // Define search paths for configuration files
     this.configPaths = [
-      path.join(process.cwd(), '.confluence-sync.json'), // Project config
+      path.join(process.cwd(), 'csconfig.json'), // Primary project config
       path.join(os.homedir(), '.config', 'confluence-sync', 'config.json'), // User config
       '/etc/confluence-sync/config.json', // Global config (Unix-like systems)
     ];
@@ -77,9 +77,19 @@ export class ConfigManager {
     // Load the profile configuration
     const profile = await this.profileManager.getProfile(activeProfileName);
 
-    // Load shared configuration
+    // Load shared configuration with defaults
     const configFile = await this.loadConfigFile(configPath);
-    const shared = configFile.shared || {};
+    const shared: SharedConfig = {
+      logLevel: configFile.shared?.logLevel ?? 'info',
+      retryAttempts: configFile.shared?.retryAttempts ?? 3,
+      retryDelay: configFile.shared?.retryDelay ?? 1000,
+      concurrentOperations: configFile.shared?.concurrentOperations,
+      conflictStrategy: configFile.shared?.conflictStrategy,
+      includePatterns: configFile.shared?.includePatterns,
+      excludePatterns: configFile.shared?.excludePatterns,
+      formatOptions: configFile.shared?.formatOptions,
+      cacheEnabled: configFile.shared?.cacheEnabled,
+    };
 
     // Merge configurations: shared < profile < env vars
     const mergedConfig = this.mergeConfigs(shared, profile, activeProfileName);
@@ -235,7 +245,7 @@ export class ConfigManager {
     const profiles = await this.profileManager.listProfiles();
     if (profiles.length > 0) {
       logger.debug(`No profile specified, using first available: ${profiles[0]}`);
-      return profiles[0];
+      return profiles[0] || null;
     }
 
     return null;
@@ -249,6 +259,15 @@ export class ConfigManager {
     profile: ProfileConfig,
     profileName: string,
   ): SyncConfig {
+    // Merge format options with proper defaults
+    const mergedFormatOptions = {
+      preserveTables: profile.formatOptions?.preserveTables ?? shared.formatOptions?.preserveTables ?? true,
+      preserveCodeBlocks: profile.formatOptions?.preserveCodeBlocks ?? shared.formatOptions?.preserveCodeBlocks ?? true,
+      preserveLinks: profile.formatOptions?.preserveLinks ?? shared.formatOptions?.preserveLinks ?? true,
+      preserveImages: profile.formatOptions?.preserveImages ?? shared.formatOptions?.preserveImages ?? true,
+      preserveMacros: profile.formatOptions?.preserveMacros ?? shared.formatOptions?.preserveMacros ?? false,
+    };
+
     return {
       profile: profileName,
       // Profile config takes precedence over shared
@@ -259,7 +278,7 @@ export class ConfigManager {
       conflictStrategy: profile.conflictStrategy ?? shared.conflictStrategy ?? 'manual',
       includePatterns: profile.includePatterns ?? shared.includePatterns ?? ['**/*.md'],
       excludePatterns: profile.excludePatterns ?? shared.excludePatterns ?? ['**/node_modules/**', '**/.git/**'],
-      formatOptions: { ...shared.formatOptions, ...profile.formatOptions } ?? {},
+      formatOptions: mergedFormatOptions,
       cacheEnabled: profile.cacheEnabled ?? shared.cacheEnabled ?? true,
       logLevel: shared.logLevel ?? 'info',
       retryAttempts: shared.retryAttempts ?? 3,
@@ -273,21 +292,21 @@ export class ConfigManager {
    */
   private applyEnvironmentVariables(config: SyncConfig): SyncConfig {
     const env = process.env;
-    
+
     // Validate auth type from environment
     const validAuthTypes = ['token', 'oauth', 'basic'] as const;
     const envAuthType = env.CONFLUENCE_SYNC_AUTH_TYPE;
-    const authType = envAuthType && validAuthTypes.includes(envAuthType as any) 
+    const authType = envAuthType && validAuthTypes.includes(envAuthType as any)
       ? (envAuthType as typeof validAuthTypes[number])
       : config.authType;
-    
+
     // Validate conflict strategy from environment
     const validStrategies = ['manual', 'local-first', 'remote-first'] as const;
     const envStrategy = env.CONFLUENCE_SYNC_CONFLICT_STRATEGY;
     const conflictStrategy = envStrategy && validStrategies.includes(envStrategy as any)
       ? (envStrategy as typeof validStrategies[number])
       : config.conflictStrategy;
-    
+
     // Validate log level from environment
     const validLogLevels = ['debug', 'info', 'warn', 'error'] as const;
     const envLogLevel = env.CONFLUENCE_SYNC_LOG_LEVEL;

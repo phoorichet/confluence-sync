@@ -1,5 +1,5 @@
 import type { Page } from '../../../src/storage/manifest-manager';
-import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../../../src/api/client';
 import { ConfluenceToMarkdownConverter } from '../../../src/converters/confluence-to-markdown';
 import { MarkdownToConfluenceConverter } from '../../../src/converters/markdown-to-confluence';
@@ -37,9 +37,9 @@ describe('SyncEngine', () => {
     backupManager = BackupManager.getInstance();
 
     // Mock logger
-    spyOn(logger, 'info').mockImplementation(() => {});
-    spyOn(logger, 'warn').mockImplementation(() => {});
-    spyOn(logger, 'error').mockImplementation(() => {});
+    vi.spyOn(logger, 'info').mockImplementation(() => {});
+    vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -89,7 +89,7 @@ describe('SyncEngine', () => {
         }],
       ]);
 
-      spyOn(manifestManager, 'load').mockResolvedValue({
+      vi.spyOn(manifestManager, 'load').mockResolvedValue({
         version: '2.0.0',
         confluenceUrl: 'https://test.atlassian.net',
         lastSyncTime: new Date(),
@@ -98,7 +98,7 @@ describe('SyncEngine', () => {
       });
 
       // Mock change detection
-      const detectSpy = spyOn(changeDetector, 'getChangeState');
+      const detectSpy = vi.spyOn(changeDetector, 'getChangeState');
       detectSpy.mockResolvedValueOnce('local-only'); // page1
       detectSpy.mockResolvedValueOnce('remote-only'); // page2
       detectSpy.mockResolvedValueOnce('conflicted'); // page3
@@ -128,7 +128,7 @@ describe('SyncEngine', () => {
         }],
       ]);
 
-      spyOn(manifestManager, 'load').mockResolvedValue({
+      vi.spyOn(manifestManager, 'load').mockResolvedValue({
         version: '2.0.0',
         confluenceUrl: 'https://test.atlassian.net',
         lastSyncTime: new Date(),
@@ -136,7 +136,7 @@ describe('SyncEngine', () => {
         pages: mockPages,
       });
 
-      spyOn(changeDetector, 'getChangeState').mockRejectedValue(new Error('Detection failed'));
+      vi.spyOn(changeDetector, 'getChangeState').mockRejectedValue(new Error('Detection failed'));
 
       await expect(syncEngine.detectChanges()).rejects.toThrow('CS-702');
     });
@@ -144,9 +144,9 @@ describe('SyncEngine', () => {
 
   describe('sync', () => {
     it('should handle successful sync with no changes', async () => {
-      spyOn(apiClient, 'initialize').mockResolvedValue();
+      vi.spyOn(apiClient, 'initialize').mockResolvedValue();
 
-      spyOn(manifestManager, 'load').mockResolvedValue({
+      vi.spyOn(manifestManager, 'load').mockResolvedValue({
         version: '2.0.0',
         confluenceUrl: 'https://test.atlassian.net',
         lastSyncTime: new Date(),
@@ -180,13 +180,13 @@ describe('SyncEngine', () => {
         status: 'modified',
       };
 
-      spyOn(apiClient, 'initialize').mockResolvedValue();
-      spyOn(apiClient, 'updatePage').mockResolvedValue({
+      vi.spyOn(apiClient, 'initialize').mockResolvedValue();
+      vi.spyOn(apiClient, 'updatePage').mockResolvedValue({
         id: 'page1',
         version: { number: 2 },
       } as any);
 
-      spyOn(manifestManager, 'load').mockResolvedValue({
+      vi.spyOn(manifestManager, 'load').mockResolvedValue({
         version: '2.0.0',
         confluenceUrl: 'https://test.atlassian.net',
         lastSyncTime: new Date(),
@@ -194,12 +194,12 @@ describe('SyncEngine', () => {
         pages: new Map([['page1', mockPage]]),
       });
 
-      spyOn(manifestManager, 'updatePage').mockResolvedValue();
-      spyOn(changeDetector, 'getChangeState').mockResolvedValue('local-only');
-      spyOn(fileManager, 'readFile').mockResolvedValue('# Test Content');
-      spyOn(fileManager, 'calculateHash').mockResolvedValue('new-hash');
+      vi.spyOn(manifestManager, 'updatePage').mockResolvedValue();
+      vi.spyOn(changeDetector, 'getChangeState').mockResolvedValue('local-only');
+      vi.spyOn(fileManager, 'readFile').mockResolvedValue('# Test Content');
+      vi.spyOn(fileManager, 'calculateHash').mockResolvedValue('new-hash');
 
-      const convertSpy = spyOn(MarkdownToConfluenceConverter.prototype, 'convert')
+      const convertSpy = vi.spyOn(MarkdownToConfluenceConverter.prototype, 'convert')
         .mockResolvedValue('<p>Test Content</p>');
 
       const result = await syncEngine.sync({
@@ -227,14 +227,14 @@ describe('SyncEngine', () => {
         status: 'synced',
       };
 
-      spyOn(apiClient, 'initialize').mockResolvedValue();
-      spyOn(apiClient, 'getPage').mockResolvedValue({
+      vi.spyOn(apiClient, 'initialize').mockResolvedValue();
+      vi.spyOn(apiClient, 'getPage').mockResolvedValue({
         id: 'page1',
         version: { number: 2 },
         body: { storage: { value: '<p>Remote content</p>' } },
       } as any);
 
-      spyOn(manifestManager, 'load').mockResolvedValue({
+      vi.spyOn(manifestManager, 'load').mockResolvedValue({
         version: '2.0.0',
         confluenceUrl: 'https://test.atlassian.net',
         lastSyncTime: new Date(),
@@ -242,14 +242,14 @@ describe('SyncEngine', () => {
         pages: new Map([['page1', mockPage]]),
       });
 
-      spyOn(manifestManager, 'updatePage').mockResolvedValue();
-      spyOn(changeDetector, 'getChangeState').mockResolvedValue('remote-only');
-      spyOn(fileManager, 'writeFile').mockResolvedValue('page1.md');
-      spyOn(fileManager, 'readFile').mockResolvedValue('old content');
-      spyOn(fileManager, 'calculateHash').mockResolvedValue('new-hash');
-      spyOn(backupManager, 'createBackup').mockResolvedValue('page1.md.backup');
+      vi.spyOn(manifestManager, 'updatePage').mockResolvedValue();
+      vi.spyOn(changeDetector, 'getChangeState').mockResolvedValue('remote-only');
+      vi.spyOn(fileManager, 'writeFile').mockResolvedValue('page1.md');
+      vi.spyOn(fileManager, 'readFile').mockResolvedValue('old content');
+      vi.spyOn(fileManager, 'calculateHash').mockResolvedValue('new-hash');
+      vi.spyOn(backupManager, 'createBackup').mockResolvedValue('page1.md.backup');
 
-      const convertSpy = spyOn(ConfluenceToMarkdownConverter.prototype, 'convert')
+      const convertSpy = vi.spyOn(ConfluenceToMarkdownConverter.prototype, 'convert')
         .mockResolvedValue('# Remote content');
 
       const result = await syncEngine.sync({
@@ -277,9 +277,9 @@ describe('SyncEngine', () => {
         status: 'conflicted',
       };
 
-      spyOn(apiClient, 'initialize').mockResolvedValue();
+      vi.spyOn(apiClient, 'initialize').mockResolvedValue();
 
-      spyOn(manifestManager, 'load').mockResolvedValue({
+      vi.spyOn(manifestManager, 'load').mockResolvedValue({
         version: '2.0.0',
         confluenceUrl: 'https://test.atlassian.net',
         lastSyncTime: new Date(),
@@ -287,7 +287,7 @@ describe('SyncEngine', () => {
         pages: new Map([['page1', mockPage]]),
       });
 
-      spyOn(changeDetector, 'getChangeState').mockResolvedValue('conflicted');
+      vi.spyOn(changeDetector, 'getChangeState').mockResolvedValue('conflicted');
 
       const result = await syncEngine.sync({
         dryRun: false,
@@ -314,10 +314,10 @@ describe('SyncEngine', () => {
         status: 'modified',
       };
 
-      spyOn(apiClient, 'initialize').mockResolvedValue();
-      const updateSpy = spyOn(apiClient, 'updatePage');
+      vi.spyOn(apiClient, 'initialize').mockResolvedValue();
+      const updateSpy = vi.spyOn(apiClient, 'updatePage');
 
-      spyOn(manifestManager, 'load').mockResolvedValue({
+      vi.spyOn(manifestManager, 'load').mockResolvedValue({
         version: '2.0.0',
         confluenceUrl: 'https://test.atlassian.net',
         lastSyncTime: new Date(),
@@ -325,7 +325,7 @@ describe('SyncEngine', () => {
         pages: new Map([['page1', mockPage]]),
       });
 
-      spyOn(changeDetector, 'getChangeState').mockResolvedValue('local-only');
+      vi.spyOn(changeDetector, 'getChangeState').mockResolvedValue('local-only');
 
       const result = await syncEngine.sync({
         dryRun: true,
@@ -351,10 +351,10 @@ describe('SyncEngine', () => {
         status: 'modified',
       };
 
-      spyOn(apiClient, 'initialize').mockResolvedValue();
-      spyOn(apiClient, 'updatePage').mockRejectedValue(new Error('API error'));
+      vi.spyOn(apiClient, 'initialize').mockResolvedValue();
+      vi.spyOn(apiClient, 'updatePage').mockRejectedValue(new Error('API error'));
 
-      spyOn(manifestManager, 'load').mockResolvedValue({
+      vi.spyOn(manifestManager, 'load').mockResolvedValue({
         version: '2.0.0',
         confluenceUrl: 'https://test.atlassian.net',
         lastSyncTime: new Date(),
@@ -362,9 +362,9 @@ describe('SyncEngine', () => {
         pages: new Map([['page1', mockPage]]),
       });
 
-      spyOn(changeDetector, 'getChangeState').mockResolvedValue('local-only');
-      spyOn(fileManager, 'readFile').mockResolvedValue('content');
-      spyOn(MarkdownToConfluenceConverter.prototype, 'convert').mockResolvedValue('<p>content</p>');
+      vi.spyOn(changeDetector, 'getChangeState').mockResolvedValue('local-only');
+      vi.spyOn(fileManager, 'readFile').mockResolvedValue('content');
+      vi.spyOn(MarkdownToConfluenceConverter.prototype, 'convert').mockResolvedValue('<p>content</p>');
 
       const result = await syncEngine.sync({
         dryRun: false,

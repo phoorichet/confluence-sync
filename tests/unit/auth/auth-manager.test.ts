@@ -3,20 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthManager, type Credentials } from '../../../src/auth/auth-manager';
 import { Keychain } from '../../../src/auth/keychain';
 
-vi.mock('../../../src/auth/keychain', () => {
-  return {
-    Keychain: vi.fn().mockImplementation(() => {
-      return {
-        getPassword: vi.fn(),
-        setPassword: vi.fn(),
-        deletePassword: vi.fn(),
-        findCredentials: vi.fn(),
-        clearCache: vi.fn(),
-      };
-    }),
-  };
-});
-vi.mock('openapi-fetch');
+// Mock Keychain
+vi.mock('../../../src/auth/keychain');
 
 describe('authManager', () => {
   let authManager: AuthManager;
@@ -28,7 +16,6 @@ describe('authManager', () => {
     (AuthManager as any).instance = undefined;
 
     // Get the mocked Keychain constructor
-    const MockedKeychain = vi.mocked(Keychain);
     mockKeychainInstance = {
       getPassword: vi.fn(),
       setPassword: vi.fn(),
@@ -37,7 +24,7 @@ describe('authManager', () => {
       clearCache: vi.fn(),
     };
 
-    MockedKeychain.mockImplementation(() => mockKeychainInstance);
+    (Keychain as any).mockImplementation(() => mockKeychainInstance);
 
     authManager = AuthManager.getInstance();
   });

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pullCommand } from '../../../src/commands/pull';
 
 describe('pull Command', () => {
@@ -7,9 +7,9 @@ describe('pull Command', () => {
 
   beforeEach(() => {
     // Spy on console methods
-    consoleLogSpy = spyOn(console, 'log').mockImplementation(() => {});
-    consoleErrorSpy = spyOn(console, 'error').mockImplementation(() => {});
-    spyOn(process, 'exit').mockImplementation(() => {
+    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });
   });

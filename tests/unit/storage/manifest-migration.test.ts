@@ -1,15 +1,17 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ManifestManager } from '../../../src/storage/manifest-manager';
 
 describe('Manifest Migration', () => {
   let manifestManager: ManifestManager;
-  const testManifestPath = path.resolve('.confluence-sync.json');
+  const testManifestPath = path.resolve('.csmanifest.json');
 
   beforeEach(() => {
     // Get a fresh instance
     manifestManager = ManifestManager.getInstance();
+    // Clear the cached manifest to force reload
+    (manifestManager as any).manifest = null;
 
     // Clean up any existing manifest
     if (fs.existsSync(testManifestPath)) {
@@ -54,9 +56,7 @@ describe('Manifest Migration', () => {
       // Check v2 fields
       expect(manifest.version).toBe('2.0.0');
       expect(manifest.syncMode).toBe('manual');
-      expect(manifest.config).toBeDefined();
-      expect(manifest.config?.profile).toBe('default');
-      expect(manifest.config?.concurrentOperations).toBe(5);
+      // Config is now managed by ConfigManager, not in manifest
       expect(manifest.operations).toBeDefined();
       expect(manifest.operations).toEqual([]);
 
@@ -170,7 +170,7 @@ describe('Manifest Migration', () => {
 
       expect(manifest.version).toBe('2.0.0');
       expect(manifest.syncMode).toBe('manual');
-      expect(manifest.config).toBeDefined();
+      // Config is now managed by ConfigManager, not in manifest
     });
 
     it('should preserve v2 manifest without migration', async () => {
@@ -181,14 +181,6 @@ describe('Manifest Migration', () => {
         lastSyncTime: new Date().toISOString(),
         syncMode: 'watch',
         pages: [],
-        config: {
-          profile: 'custom',
-          includePatterns: ['*.md'],
-          excludePatterns: ['*.tmp'],
-          concurrentOperations: 10,
-          conflictStrategy: 'local-first',
-          cacheEnabled: false,
-        },
         operations: [],
       };
 
@@ -199,9 +191,7 @@ describe('Manifest Migration', () => {
       // Should preserve all v2 fields
       expect(manifest.version).toBe('2.0.0');
       expect(manifest.syncMode).toBe('watch');
-      expect(manifest.config?.profile).toBe('custom');
-      expect(manifest.config?.concurrentOperations).toBe(10);
-      expect(manifest.config?.conflictStrategy).toBe('local-first');
+      // Config is now managed by ConfigManager, not in manifest
     });
 
     it('should handle corrupted manifest with migration attempt', async () => {
@@ -283,14 +273,6 @@ describe('Manifest Migration', () => {
             children: [],
           }],
         ],
-        config: {
-          profile: 'default',
-          includePatterns: ['**/*.md'],
-          excludePatterns: [],
-          concurrentOperations: 5,
-          conflictStrategy: 'manual',
-          cacheEnabled: true,
-        },
         operations: [],
       };
 

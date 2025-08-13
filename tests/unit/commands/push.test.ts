@@ -1,6 +1,6 @@
 import type { SyncManifest } from '../../../src/storage/manifest-manager';
 import * as fs from 'node:fs';
-import { afterEach, beforeEach, describe, expect, it, type Mock, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { apiClient } from '../../../src/api/client';
 import { pushCommand } from '../../../src/commands/push';
 import { MarkdownToConfluenceConverter } from '../../../src/converters/markdown-to-confluence';
@@ -51,31 +51,31 @@ describe('Push Command', () => {
 
   beforeEach(() => {
     // Mock ManifestManager
-    manifestSpy = spyOn(ManifestManager.prototype, 'load').mockResolvedValue(mockManifest);
-    spyOn(ManifestManager.prototype, 'updatePage').mockResolvedValue();
+    manifestSpy = vi.spyOn(ManifestManager.prototype, 'load').mockResolvedValue(mockManifest);
+    vi.spyOn(ManifestManager.prototype, 'updatePage').mockResolvedValue();
 
     // Mock API client initialization
-    spyOn(apiClient, 'initialize').mockResolvedValue();
+    vi.spyOn(apiClient, 'initialize').mockResolvedValue();
 
     // Mock API client
-    apiClientSpy = spyOn(apiClient, 'getPage').mockResolvedValue(mockPageResponse);
-    spyOn(apiClient, 'updatePage').mockResolvedValue({
+    apiClientSpy = vi.spyOn(apiClient, 'getPage').mockResolvedValue(mockPageResponse);
+    vi.spyOn(apiClient, 'updatePage').mockResolvedValue({
       ...mockPageResponse,
       version: { number: 2, when: new Date().toISOString() },
     });
 
     // Mock file system
-    spyOn(fs, 'existsSync').mockReturnValue(true);
-    spyOn(fs, 'statSync').mockReturnValue({ isFile: () => true } as any);
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+    vi.spyOn(fs, 'statSync').mockReturnValue({ isFile: () => true } as any);
 
     // Mock FileManager
-    spyOn(FileManager.prototype, 'readFile').mockResolvedValue('# Test Content\n\nThis is a test.');
-    spyOn(FileManager.prototype, 'createBackup').mockResolvedValue('test.md.backup');
+    vi.spyOn(FileManager.prototype, 'readFile').mockResolvedValue('# Test Content\n\nThis is a test.');
+    vi.spyOn(FileManager.prototype, 'createBackup').mockResolvedValue('test.md.backup');
 
     // Mock console
-    consoleLogSpy = spyOn(console, 'log').mockImplementation(() => {});
-    consoleErrorSpy = spyOn(console, 'error').mockImplementation(() => {});
-    processExitSpy = spyOn(process, 'exit').mockImplementation(() => {
+    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('Process exit');
     });
   });
@@ -87,11 +87,11 @@ describe('Push Command', () => {
     consoleErrorSpy.mockRestore();
     processExitSpy.mockRestore();
     // Clear all mocks
-    spyOn(apiClient, 'updatePage').mockRestore();
+    vi.spyOn(apiClient, 'updatePage').mockRestore();
   });
 
   it('should validate file exists', async () => {
-    spyOn(fs, 'existsSync').mockReturnValue(false);
+    vi.spyOn(fs, 'existsSync').mockReturnValue(false);
 
     try {
       await pushCommand.parseAsync(['node', 'push', 'nonexistent.md']);
@@ -199,7 +199,7 @@ describe('Push Command', () => {
   });
 
   it('should handle API errors gracefully', async () => {
-    spyOn(apiClient, 'updatePage').mockRejectedValue(new Error('Network error'));
+    vi.spyOn(apiClient, 'updatePage').mockRejectedValue(new Error('Network error'));
 
     try {
       await pushCommand.parseAsync(['node', 'push', 'test.md']);
@@ -212,7 +212,7 @@ describe('Push Command', () => {
   });
 
   it('should convert markdown content to Confluence format', async () => {
-    const converterSpy = spyOn(MarkdownToConfluenceConverter.prototype, 'convert');
+    const converterSpy = vi.spyOn(MarkdownToConfluenceConverter.prototype, 'convert');
     converterSpy.mockResolvedValue('<h1>Converted</h1>');
 
     await pushCommand.parseAsync(['node', 'push', 'test.md']);

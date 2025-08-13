@@ -1,7 +1,7 @@
 import type { Page } from '../../../src/storage/manifest-manager';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, type Mock, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { apiClient } from '../../../src/api/client';
 import { ChangeDetector } from '../../../src/sync/change-detector';
 import * as hashUtils from '../../../src/utils/hash';
@@ -28,18 +28,18 @@ describe('ChangeDetector', () => {
     changeDetector = ChangeDetector.getInstance();
 
     // Mock API client
-    spyOn(apiClient, 'initialize').mockResolvedValue();
-    apiClientSpy = spyOn(apiClient, 'getPage').mockResolvedValue({
+    vi.spyOn(apiClient, 'initialize').mockResolvedValue();
+    apiClientSpy = vi.spyOn(apiClient, 'getPage').mockResolvedValue({
       id: '123',
       title: 'Test Page',
       version: { number: 1 },
     });
 
     // Mock file system
-    existsSyncSpy = spyOn(fs, 'existsSync').mockReturnValue(true);
+    existsSyncSpy = vi.spyOn(fs, 'existsSync').mockReturnValue(true);
 
     // Mock hash utilities
-    calculateFileHashSpy = spyOn(hashUtils, 'calculateFileHash').mockReturnValue('abc123');
+    calculateFileHashSpy = vi.spyOn(hashUtils, 'calculateFileHash').mockReturnValue('abc123');
   });
 
   afterEach(() => {

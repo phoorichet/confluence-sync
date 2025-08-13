@@ -130,7 +130,7 @@ export const initCommand = new Command('init')
         : defaultDir;
 
       // Step 4: File Patterns
-      let patterns: string[] = ['**/*.md']; // Default pattern
+      let _patterns: string[] = ['**/*.md']; // Default pattern
 
       if (isInteractive) {
         console.log(chalk.cyan('\n🔍 File Patterns\n'));
@@ -140,7 +140,7 @@ export const initCommand = new Command('init')
           true,
         );
 
-        patterns = includeAllMarkdown
+        _patterns = includeAllMarkdown
           ? ['**/*.md']
           : [await promptManager.text(
               'Enter file pattern (e.g., docs/**/*.md):',
@@ -180,14 +180,8 @@ export const initCommand = new Command('init')
       // Load will create a new manifest with the stored credentials URL
       await manifestManager.load();
 
-      // Update the config section with user preferences
-      const manifest = await manifestManager.getManifest();
-      if (manifest && manifest.config) {
-        manifest.config.includePatterns = patterns;
-        manifest.config.excludePatterns = [];
-        // Save the updated manifest
-        await manifestManager.save();
-      }
+      // The include/exclude patterns are now managed through ConfigManager
+      // not the manifest file
 
       spinner.succeed(chalk.green('Sync manifest initialized'));
 

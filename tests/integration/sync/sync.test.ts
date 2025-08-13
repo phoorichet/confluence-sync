@@ -1,7 +1,7 @@
 import type { Page } from '../../../src/storage/manifest-manager';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../../../src/api/client';
 import { ManifestManager } from '../../../src/storage/manifest-manager';
 import { SyncEngine } from '../../../src/sync/engine';
@@ -26,12 +26,12 @@ describe('Sync Integration Tests', () => {
     manifestManager = ManifestManager.getInstance();
 
     // Mock logger
-    spyOn(logger, 'info').mockImplementation(() => {});
-    spyOn(logger, 'warn').mockImplementation(() => {});
-    spyOn(logger, 'error').mockImplementation(() => {});
+    vi.spyOn(logger, 'info').mockImplementation(() => {});
+    vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
 
     // Mock API client
-    spyOn(apiClient, 'initialize').mockResolvedValue();
+    vi.spyOn(apiClient, 'initialize').mockResolvedValue();
   });
 
   afterEach(() => {
@@ -98,11 +98,11 @@ describe('Sync Integration Tests', () => {
       };
 
       // Mock manifest operations
-      spyOn(manifestManager, 'load').mockResolvedValue(testManifest);
-      spyOn(manifestManager, 'updatePage').mockResolvedValue();
+      vi.spyOn(manifestManager, 'load').mockResolvedValue(testManifest);
+      vi.spyOn(manifestManager, 'updatePage').mockResolvedValue();
 
       // Mock API responses
-      spyOn(apiClient, 'getPage')
+      vi.spyOn(apiClient, 'getPage')
         .mockImplementation(async (pageId: string) => {
           if (pageId === 'page2') {
             // Remote changed page
@@ -120,7 +120,7 @@ describe('Sync Integration Tests', () => {
           } as any;
         });
 
-      spyOn(apiClient, 'updatePage').mockResolvedValue({
+      vi.spyOn(apiClient, 'updatePage').mockResolvedValue({
         id: 'page1',
         version: { number: 2 },
       } as any);
@@ -164,10 +164,10 @@ describe('Sync Integration Tests', () => {
         ]),
       };
 
-      spyOn(manifestManager, 'load').mockResolvedValue(testManifest);
+      vi.spyOn(manifestManager, 'load').mockResolvedValue(testManifest);
 
       // Mock both local and remote changes
-      spyOn(apiClient, 'getPage').mockResolvedValue({
+      vi.spyOn(apiClient, 'getPage').mockResolvedValue({
         id: 'page1',
         version: { number: 2 }, // Remote changed
         body: { storage: { value: '<p>Remote changed content</p>' } },
@@ -209,9 +209,9 @@ describe('Sync Integration Tests', () => {
         ]),
       };
 
-      spyOn(manifestManager, 'load').mockResolvedValue(testManifest);
-      const updateSpy = spyOn(apiClient, 'updatePage');
-      const manifestUpdateSpy = spyOn(manifestManager, 'updatePage');
+      vi.spyOn(manifestManager, 'load').mockResolvedValue(testManifest);
+      const updateSpy = vi.spyOn(apiClient, 'updatePage');
+      const manifestUpdateSpy = vi.spyOn(manifestManager, 'updatePage');
 
       const result = await syncEngine.sync({
         dryRun: true,
@@ -250,10 +250,10 @@ describe('Sync Integration Tests', () => {
         ]),
       };
 
-      spyOn(manifestManager, 'load').mockResolvedValue(testManifest);
+      vi.spyOn(manifestManager, 'load').mockResolvedValue(testManifest);
 
       // Mock API error
-      spyOn(apiClient, 'updatePage').mockRejectedValue(new Error('API Error'));
+      vi.spyOn(apiClient, 'updatePage').mockRejectedValue(new Error('API Error'));
 
       const result = await syncEngine.sync({
         dryRun: false,
@@ -299,13 +299,13 @@ describe('Sync Integration Tests', () => {
         pages,
       };
 
-      spyOn(manifestManager, 'load').mockResolvedValue(testManifest);
-      spyOn(manifestManager, 'updatePage').mockResolvedValue();
+      vi.spyOn(manifestManager, 'load').mockResolvedValue(testManifest);
+      vi.spyOn(manifestManager, 'updatePage').mockResolvedValue();
 
       let concurrentCalls = 0;
       let maxConcurrent = 0;
 
-      spyOn(apiClient, 'updatePage').mockImplementation(async () => {
+      vi.spyOn(apiClient, 'updatePage').mockImplementation(async () => {
         concurrentCalls++;
         maxConcurrent = Math.max(maxConcurrent, concurrentCalls);
 

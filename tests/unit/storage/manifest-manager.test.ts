@@ -4,6 +4,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthManager } from '../../../src/auth/auth-manager';
 import { ManifestManager } from '../../../src/storage/manifest-manager';
 
+// Mock fs module
+vi.mock('node:fs', () => ({
+  existsSync: vi.fn(),
+  readFileSync: vi.fn(),
+  writeFileSync: vi.fn(),
+}));
+
+// Mock AuthManager
+vi.mock('../../../src/auth/auth-manager', () => ({
+  AuthManager: {
+    getInstance: vi.fn(),
+  },
+}));
+
 describe('manifestManager', () => {
   let manifestManager: ManifestManager;
 
@@ -14,13 +28,13 @@ describe('manifestManager', () => {
     (ManifestManager as any).instance = undefined;
 
     // Mock AuthManager
-    vi.spyOn(AuthManager, 'getInstance').mockReturnValue({
+    (AuthManager.getInstance as any).mockReturnValue({
       getStoredCredentials: vi.fn().mockResolvedValue({
         url: 'https://test.atlassian.net',
         username: 'test@example.com',
         authType: 'cloud',
       }),
-    } as any);
+    });
 
     manifestManager = ManifestManager.getInstance();
   });
@@ -40,21 +54,21 @@ describe('manifestManager', () => {
   describe('load', () => {
     it('should create new manifest if file does not exist', async () => {
       // Arrange
-      vi.spyOn(fs, 'existsSync').mockReturnValue(false);
-      vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+      (fs.existsSync as any).mockReturnValue(false);
+      (fs.writeFileSync as any).mockImplementation(() => {});
 
       // Act
       const manifest = await manifestManager.load();
 
       // Assert
-      expect(manifest).toEqual({
-        version: '1.0.0',
-        confluenceUrl: 'https://test.atlassian.net',
-        lastSyncTime: expect.any(Date),
-        pages: new Map(),
-      });
+      expect(manifest.version).toBe('2.0.0');
+      expect(manifest.confluenceUrl).toBe('https://test.atlassian.net');
+      expect(manifest.lastSyncTime).toBeInstanceOf(Date);
+      expect(manifest.syncMode).toBe('manual');
+      expect(manifest.pages).toBeInstanceOf(Map);
+      expect(manifest.pages.size).toBe(0);
       expect(fs.writeFileSync).toHaveBeenCalledWith(
-        expect.stringContaining('.confluence-sync.json'),
+        expect.stringContaining('.csmanifest.json'),
         expect.any(String),
         'utf-8',
       );
@@ -63,9 +77,10 @@ describe('manifestManager', () => {
     it('should load existing manifest from file', async () => {
       // Arrange
       const existingManifest = {
-        version: '1.0.0',
+        version: '2.0.0',
         confluenceUrl: 'https://test.atlassian.net',
         lastSyncTime: '2024-01-15T10:00:00Z',
+        syncMode: 'manual',
         pages: [
           ['page1', {
             id: 'page1',
@@ -81,14 +96,14 @@ describe('manifestManager', () => {
         ],
       };
 
-      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-      vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(existingManifest));
+      (fs.existsSync as any).mockReturnValue(true);
+      (fs.readFileSync as any).mockReturnValue(JSON.stringify(existingManifest));
 
       // Act
       const manifest = await manifestManager.load();
 
       // Assert
-      expect(manifest.version).toBe('1.0.0');
+      expect(manifest.version).toBe('2.0.0');
       expect(manifest.confluenceUrl).toBe('https://test.atlassian.net');
       expect(manifest.lastSyncTime).toBeInstanceOf(Date);
       expect(manifest.pages).toBeInstanceOf(Map);
@@ -127,8 +142,8 @@ describe('manifestManager', () => {
         },
       };
 
-      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-      vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(existingManifest));
+      (fs.existsSync as any).mockReturnValue(true);
+      (fs.readFileSync as any).mockReturnValue(JSON.stringify(existingManifest));
 
       // Act
       const manifest = await manifestManager.load();
@@ -139,28 +154,22 @@ describe('manifestManager', () => {
       expect(manifest.pages.get('page1')).toBeDefined();
     });
 
-    it('should create new manifest if existing one is corrupted', async () => {
+    it('should throw error if existing manifest is corrupted', async () => {
       // Arrange
-      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-      vi.spyOn(fs, 'readFileSync').mockReturnValue('{ invalid json }');
-      vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+      (fs.existsSync as any).mockReturnValue(true);
+      (fs.readFileSync as any).mockReturnValue('{ invalid json }');
+      (fs.writeFileSync as any).mockImplementation(() => {});
 
-      // Act
-      const manifest = await manifestManager.load();
-
-      // Assert
-      expect(manifest.version).toBe('1.0.0');
-      expect(manifest.pages).toBeInstanceOf(Map);
-      expect(manifest.pages.size).toBe(0);
-      expect(fs.writeFileSync).toHaveBeenCalled();
+      // Act & Assert
+      await expect(manifestManager.load()).rejects.toThrow('CS-503');
     });
   });
 
   describe('save', () => {
     it('should save manifest to file', async () => {
       // Arrange
-      vi.spyOn(fs, 'existsSync').mockReturnValue(false);
-      vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+      (fs.existsSync as any).mockReturnValue(false);
+      (fs.writeFileSync as any).mockImplementation(() => {});
 
       await manifestManager.load();
 
@@ -169,18 +178,18 @@ describe('manifestManager', () => {
 
       // Assert
       expect(fs.writeFileSync).toHaveBeenCalledWith(
-        expect.stringContaining('.confluence-sync.json'),
-        expect.stringContaining('"version": "1.0.0"'),
+        expect.stringContaining('.csmanifest.json'),
+        expect.stringContaining('"version": "2.0.0"'),
         'utf-8',
       );
     });
 
     it('should convert Map to array for JSON serialization', async () => {
       // Arrange
-      vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+      (fs.existsSync as any).mockReturnValue(false);
       let savedContent = '';
-      vi.spyOn(fs, 'writeFileSync').mockImplementation((path, content) => {
-        savedContent = content as string;
+      (fs.writeFileSync as any).mockImplementation((_path: string, content: string) => {
+        savedContent = content;
       });
 
       await manifestManager.load();
@@ -210,8 +219,8 @@ describe('manifestManager', () => {
   describe('updatePage', () => {
     it('should add new page to manifest', async () => {
       // Arrange
-      vi.spyOn(fs, 'existsSync').mockReturnValue(false);
-      vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+      (fs.existsSync as any).mockReturnValue(false);
+      (fs.writeFileSync as any).mockImplementation(() => {});
 
       const newPage: Page = {
         id: 'page1',
@@ -235,8 +244,8 @@ describe('manifestManager', () => {
 
     it('should update existing page in manifest', async () => {
       // Arrange
-      vi.spyOn(fs, 'existsSync').mockReturnValue(false);
-      vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+      (fs.existsSync as any).mockReturnValue(false);
+      (fs.writeFileSync as any).mockImplementation(() => {});
 
       const originalPage: Page = {
         id: 'page1',
@@ -273,8 +282,8 @@ describe('manifestManager', () => {
 
     it('should update lastSyncTime when updating page', async () => {
       // Arrange
-      vi.spyOn(fs, 'existsSync').mockReturnValue(false);
-      vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+      (fs.existsSync as any).mockReturnValue(false);
+      (fs.writeFileSync as any).mockImplementation(() => {});
 
       const beforeUpdate = new Date();
 
@@ -300,8 +309,8 @@ describe('manifestManager', () => {
   describe('getPage', () => {
     it('should return page if exists', async () => {
       // Arrange
-      vi.spyOn(fs, 'existsSync').mockReturnValue(false);
-      vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+      (fs.existsSync as any).mockReturnValue(false);
+      (fs.writeFileSync as any).mockImplementation(() => {});
 
       const page: Page = {
         id: 'page1',
@@ -326,8 +335,8 @@ describe('manifestManager', () => {
 
     it('should return undefined if page does not exist', async () => {
       // Arrange
-      vi.spyOn(fs, 'existsSync').mockReturnValue(false);
-      vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+      (fs.existsSync as any).mockReturnValue(false);
+      (fs.writeFileSync as any).mockImplementation(() => {});
 
       // Act
       const result = await manifestManager.getPage('nonexistent');
@@ -340,8 +349,8 @@ describe('manifestManager', () => {
   describe('getAllPages', () => {
     it('should return all pages', async () => {
       // Arrange
-      vi.spyOn(fs, 'existsSync').mockReturnValue(false);
-      vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+      (fs.existsSync as any).mockReturnValue(false);
+      (fs.writeFileSync as any).mockImplementation(() => {});
 
       const page1: Page = {
         id: 'page1',
@@ -384,8 +393,8 @@ describe('manifestManager', () => {
   describe('removePage', () => {
     it('should remove page from manifest', async () => {
       // Arrange
-      vi.spyOn(fs, 'existsSync').mockReturnValue(false);
-      vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+      (fs.existsSync as any).mockReturnValue(false);
+      (fs.writeFileSync as any).mockImplementation(() => {});
 
       const page: Page = {
         id: 'page1',
@@ -413,8 +422,8 @@ describe('manifestManager', () => {
   describe('clearPages', () => {
     it('should clear all pages from manifest', async () => {
       // Arrange
-      vi.spyOn(fs, 'existsSync').mockReturnValue(false);
-      vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+      (fs.existsSync as any).mockReturnValue(false);
+      (fs.writeFileSync as any).mockImplementation(() => {});
 
       await manifestManager.updatePage({
         id: 'page1',

@@ -4,16 +4,6 @@ import { z } from 'zod';
 import { AuthManager } from '../auth/auth-manager.js';
 import { logger } from '../utils/logger.js';
 
-// Define the SyncConfig schema
-const SyncConfigSchema = z.object({
-  profile: z.string().default('default'),
-  includePatterns: z.array(z.string()).default(['**/*.md']),
-  excludePatterns: z.array(z.string()).default([]),
-  concurrentOperations: z.number().default(5),
-  conflictStrategy: z.enum(['manual', 'local-first', 'remote-first']).default('manual'),
-  cacheEnabled: z.boolean().default(true),
-});
-
 // Define the SyncOperation schema
 const SyncOperationSchema = z.object({
   id: z.string(),
@@ -87,7 +77,7 @@ const PageSchema = z.object({
   resolutionHistory: z.array(ResolutionRecordSchema).optional(), // Track conflict resolutions
 });
 
-// Define the SyncManifest schema (v2)
+// Define the SyncManifest schema
 const SyncManifestSchema = z.object({
   version: z.string().default('2.0.0'), // Version for migration support
   confluenceUrl: z.string(),
@@ -96,26 +86,16 @@ const SyncManifestSchema = z.object({
   pages: z.map(z.string(), PageSchema),
   spaces: z.map(z.string(), SpaceSchema).optional(), // Space metadata storage
   folders: z.map(z.string(), FolderSchema).optional(), // Folder metadata storage
-  config: SyncConfigSchema.optional(),
   operations: z.array(SyncOperationSchema).optional(),
-});
-
-// Legacy v1 schema for migration - not used directly but kept for reference
-const _SyncManifestV1Schema = z.object({
-  version: z.string(),
-  confluenceUrl: z.string(),
-  lastSyncTime: z.date(),
-  pages: z.map(z.string(), PageSchema),
+  filters: z.record(z.string(), z.any()).optional(), // Saved search filters
 });
 
 export type ResolutionRecord = z.infer<typeof ResolutionRecordSchema>;
 export type Space = z.infer<typeof SpaceSchema>;
 export type Folder = z.infer<typeof FolderSchema>;
 export type Page = z.infer<typeof PageSchema>;
-export type SyncConfig = z.infer<typeof SyncConfigSchema>;
 export type SyncOperation = z.infer<typeof SyncOperationSchema>;
 export type SyncManifest = z.infer<typeof SyncManifestSchema>;
-export type SyncManifestV1 = z.infer<typeof _SyncManifestV1Schema>;
 
 export class ManifestManager {
   private static instance: ManifestManager;
@@ -123,7 +103,7 @@ export class ManifestManager {
   private manifest: SyncManifest | null = null;
 
   private constructor() {
-    this.manifestPath = path.resolve('.confluence-sync.json');
+    this.manifestPath = path.resolve('.csmanifest.json');
   }
 
   public static getInstance(): ManifestManager {
@@ -142,12 +122,12 @@ export class ManifestManager {
         const content = readFileSync(this.manifestPath, 'utf-8');
         const rawData = JSON.parse(content);
 
-        // Check if migration is needed (v1 to v2)
+        // Check if migration is needed (legacy format without version or v1)
         if (!rawData.version || rawData.version === '1.0.0') {
-          logger.info('Detected v1 manifest, migrating to v2...');
+          logger.info('Detected v1 manifest, migrating to v2.0.0...');
           this.manifest = await this.migrateV1ToV2(rawData);
           await this.save();
-          logger.info('Successfully migrated manifest to v2');
+          logger.info('Successfully migrated manifest to v2.0.0');
           return this.manifest;
         }
 
@@ -258,7 +238,7 @@ export class ManifestManager {
         try {
           const content = readFileSync(this.manifestPath, 'utf-8');
           const rawData = JSON.parse(content);
-          if (!rawData.version || rawData.version === '1.0.0') {
+          if (!rawData.version) {
             this.manifest = await this.migrateV1ToV2(rawData);
             await this.save();
             return this.manifest;
@@ -324,7 +304,7 @@ export class ManifestManager {
       }
     }
 
-    // Create v2 manifest with default config
+    // Create v2 manifest
     const v2Manifest: SyncManifest = {
       version: '2.0.0',
       confluenceUrl: v1Data.confluenceUrl || '',
@@ -333,14 +313,6 @@ export class ManifestManager {
       pages: pagesMap,
       spaces: new Map(), // Initialize empty spaces map
       folders: new Map(), // Initialize empty folders map
-      config: {
-        profile: 'default',
-        includePatterns: ['**/*.md'],
-        excludePatterns: [],
-        concurrentOperations: 5,
-        conflictStrategy: 'manual',
-        cacheEnabled: true,
-      },
       operations: [],
     };
 
@@ -534,14 +506,6 @@ export class ManifestManager {
       pages: new Map(),
       spaces: new Map(),
       folders: new Map(),
-      config: {
-        profile: 'default',
-        includePatterns: ['**/*.md'],
-        excludePatterns: [],
-        concurrentOperations: 5,
-        conflictStrategy: 'manual',
-        cacheEnabled: true,
-      },
       operations: [],
     };
   }

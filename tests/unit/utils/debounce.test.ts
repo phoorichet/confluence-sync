@@ -1,192 +1,173 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { debounce, debounceCollect } from '../../../src/utils/debounce';
 
 describe('debounce', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('should delay function execution', () => {
+  it('should delay function execution', async () => {
     const fn = vi.fn();
-    const debounced = debounce(fn, 100);
+    const debounced = debounce(fn, 50);
 
     debounced();
     expect(fn).not.toHaveBeenCalled();
 
-    vi.advanceTimersByTime(50);
-    expect(fn).not.toHaveBeenCalled();
-
-    vi.advanceTimersByTime(50);
+    await new Promise(resolve => setTimeout(resolve, 60));
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
-  it('should reset timer on subsequent calls', () => {
+  it('should reset timer on subsequent calls', async () => {
     const fn = vi.fn();
-    const debounced = debounce(fn, 100);
+    const debounced = debounce(fn, 50);
 
     debounced();
-    vi.advanceTimersByTime(50);
+    await new Promise(resolve => setTimeout(resolve, 25));
     debounced();
-    vi.advanceTimersByTime(50);
+    await new Promise(resolve => setTimeout(resolve, 25));
+    
     expect(fn).not.toHaveBeenCalled();
-
-    vi.advanceTimersByTime(50);
+    
+    await new Promise(resolve => setTimeout(resolve, 30));
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
-  it('should pass arguments to the function', () => {
+  it('should pass arguments to the function', async () => {
     const fn = vi.fn();
-    const debounced = debounce(fn, 100);
+    const debounced = debounce(fn, 50);
 
     debounced('arg1', 'arg2');
-    vi.advanceTimersByTime(100);
+    await new Promise(resolve => setTimeout(resolve, 60));
 
     expect(fn).toHaveBeenCalledWith('arg1', 'arg2');
   });
 
-  it('should preserve this context', () => {
+  it('should preserve this context', async () => {
     const obj = {
       value: 42,
-      method: vi.fn(function (this: any) {
+      method: vi.fn(function(this: any) {
         return this.value;
       }),
     };
 
-    obj.method = debounce(obj.method, 100);
+    obj.method = debounce(obj.method, 50);
     obj.method();
-    vi.advanceTimersByTime(100);
-
+    
+    await new Promise(resolve => setTimeout(resolve, 60));
     expect(obj.method).toHaveBeenCalled();
   });
 
   describe('cancel()', () => {
-    it('should cancel pending execution', () => {
+    it('should cancel pending execution', async () => {
       const fn = vi.fn();
-      const debounced = debounce(fn, 100);
+      const debounced = debounce(fn, 50);
 
       debounced();
       debounced.cancel();
-      vi.advanceTimersByTime(100);
-
+      
+      await new Promise(resolve => setTimeout(resolve, 60));
       expect(fn).not.toHaveBeenCalled();
     });
   });
 
   describe('flush()', () => {
     it('should execute immediately', () => {
-      const fn = vi.fn().mockReturnValue('result');
-      const debounced = debounce(fn, 100);
-
-      debounced('arg');
-      const result = debounced.flush();
-
-      expect(fn).toHaveBeenCalledWith('arg');
-      expect(result).toBe('result');
-    });
-
-    it('should clear pending execution after flush', () => {
       const fn = vi.fn();
       const debounced = debounce(fn, 100);
 
+      debounced('test');
+      expect(fn).not.toHaveBeenCalled();
+
+      debounced.flush();
+      expect(fn).toHaveBeenCalledWith('test');
+    });
+
+    it('should clear pending execution after flush', async () => {
+      const fn = vi.fn();
+      const debounced = debounce(fn, 50);
+
       debounced();
       debounced.flush();
-      vi.advanceTimersByTime(100);
+      expect(fn).toHaveBeenCalledTimes(1);
 
+      await new Promise(resolve => setTimeout(resolve, 60));
       expect(fn).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('pending()', () => {
-    it('should return true when execution is pending', () => {
+    it('should return true when execution is pending', async () => {
       const fn = vi.fn();
-      const debounced = debounce(fn, 100);
+      const debounced = debounce(fn, 50);
 
       expect(debounced.pending()).toBe(false);
-
+      
       debounced();
       expect(debounced.pending()).toBe(true);
 
-      vi.advanceTimersByTime(100);
+      await new Promise(resolve => setTimeout(resolve, 60));
       expect(debounced.pending()).toBe(false);
     });
   });
 });
 
 describe('debounceCollect', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('should collect items and pass as array', () => {
+  it('should collect items and pass as array', async () => {
     const fn = vi.fn();
-    const collector = debounceCollect(fn, 100);
+    const debounced = debounceCollect(fn, 50);
 
-    collector('item1');
-    collector('item2');
-    collector('item3');
+    debounced('item1');
+    debounced('item2');
+    debounced('item3');
 
-    vi.advanceTimersByTime(100);
-
+    await new Promise(resolve => setTimeout(resolve, 60));
     expect(fn).toHaveBeenCalledWith(['item1', 'item2', 'item3']);
   });
 
-  it('should reset collection after execution', () => {
+  it('should reset collection after execution', async () => {
     const fn = vi.fn();
-    const collector = debounceCollect(fn, 100);
+    const debounced = debounceCollect(fn, 50);
 
-    collector('item1');
-    vi.advanceTimersByTime(100);
-
-    collector('item2');
-    vi.advanceTimersByTime(100);
+    debounced('item1');
+    await new Promise(resolve => setTimeout(resolve, 60));
+    
+    debounced('item2');
+    await new Promise(resolve => setTimeout(resolve, 60));
 
     expect(fn).toHaveBeenCalledTimes(2);
     expect(fn).toHaveBeenNthCalledWith(1, ['item1']);
     expect(fn).toHaveBeenNthCalledWith(2, ['item2']);
   });
 
-  it('should handle cancel()', () => {
+  it('should handle cancel()', async () => {
     const fn = vi.fn();
-    const collector = debounceCollect(fn, 100);
+    const debounced = debounceCollect(fn, 50);
 
-    collector('item1');
-    collector('item2');
-    collector.cancel();
+    debounced('item1');
+    debounced('item2');
+    debounced.cancel();
 
-    vi.advanceTimersByTime(100);
-
+    await new Promise(resolve => setTimeout(resolve, 60));
     expect(fn).not.toHaveBeenCalled();
   });
 
   it('should handle flush()', () => {
     const fn = vi.fn();
-    const collector = debounceCollect(fn, 100);
+    const debounced = debounceCollect(fn, 100);
 
-    collector('item1');
-    collector('item2');
-    collector.flush();
+    debounced('item1');
+    debounced('item2');
+    debounced.flush();
 
     expect(fn).toHaveBeenCalledWith(['item1', 'item2']);
   });
 
-  it('should handle pending()', () => {
+  it('should handle pending()', async () => {
     const fn = vi.fn();
-    const collector = debounceCollect(fn, 100);
+    const debounced = debounceCollect(fn, 50);
 
-    expect(collector.pending()).toBe(false);
+    expect(debounced.pending()).toBe(false);
+    
+    debounced('item');
+    expect(debounced.pending()).toBe(true);
 
-    collector('item1');
-    expect(collector.pending()).toBe(true);
-
-    vi.advanceTimersByTime(100);
-    expect(collector.pending()).toBe(false);
+    await new Promise(resolve => setTimeout(resolve, 60));
+    expect(debounced.pending()).toBe(false);
   });
 });

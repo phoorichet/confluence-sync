@@ -48,7 +48,7 @@ describe('config Command Integration', () => {
 
     // Create temporary test directory
     testDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'confluence-sync-test-'));
-    configPath = path.join(testDir, '.confluence-sync.json');
+    configPath = path.join(testDir, 'csconfig.json');
 
     // Write mock config
     await fs.promises.writeFile(configPath, JSON.stringify(mockConfig, null, 2));

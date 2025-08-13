@@ -1,11 +1,11 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../../../src/api/client';
 import { ManifestManager } from '../../../src/storage/manifest-manager';
 
 describe('Hierarchy Push Integration', () => {
-  const testDir = path.join(import.meta.dir, 'test-push-dir');
+  const testDir = path.join(__dirname, 'test-push-dir');
   const _manifestPath = path.join(testDir, '.confluence-sync.json');
 
   beforeEach(() => {
@@ -58,8 +58,8 @@ describe('Hierarchy Push Integration', () => {
 
     // Mock ManifestManager
     const manifestManager = ManifestManager.getInstance();
-    spyOn(manifestManager, 'load').mockResolvedValue(mockManifest);
-    spyOn(manifestManager, 'updatePage').mockResolvedValue();
+    vi.spyOn(manifestManager, 'load').mockResolvedValue(mockManifest);
+    vi.spyOn(manifestManager, 'updatePage').mockResolvedValue();
   });
 
   afterEach(() => {
@@ -145,8 +145,8 @@ describe('Hierarchy Push Integration', () => {
   it('should create pages in correct parent-child order', async () => {
     // Mock API client
     const mockApiClient = apiClient;
-    spyOn(mockApiClient, 'initialize').mockResolvedValue();
-    spyOn(mockApiClient, 'getSpace').mockResolvedValue({
+    vi.spyOn(mockApiClient, 'initialize').mockResolvedValue();
+    vi.spyOn(mockApiClient, 'getSpace').mockResolvedValue({
       id: 'space-123',
       key: 'TEST',
       name: 'Test Space',
@@ -154,7 +154,7 @@ describe('Hierarchy Push Integration', () => {
     } as any);
 
     const createdPages: Array<{ title: string; parentId?: string }> = [];
-    spyOn(mockApiClient, 'createPage').mockImplementation(
+    vi.spyOn(mockApiClient, 'createPage').mockImplementation(
       async (spaceId: string, title: string, body: string, parentId?: string) => {
         createdPages.push({ title, parentId });
         return {
@@ -177,8 +177,8 @@ describe('Hierarchy Push Integration', () => {
   it('should handle bulk push with error recovery', async () => {
     // Mock API client
     const mockApiClient = apiClient;
-    spyOn(mockApiClient, 'initialize').mockResolvedValue();
-    spyOn(mockApiClient, 'getSpace').mockResolvedValue({
+    vi.spyOn(mockApiClient, 'initialize').mockResolvedValue();
+    vi.spyOn(mockApiClient, 'getSpace').mockResolvedValue({
       id: 'space-123',
       key: 'TEST',
       name: 'Test Space',
@@ -186,7 +186,7 @@ describe('Hierarchy Push Integration', () => {
     } as any);
 
     let callCount = 0;
-    spyOn(mockApiClient, 'createPage').mockImplementation(async () => {
+    vi.spyOn(mockApiClient, 'createPage').mockImplementation(async () => {
       callCount++;
       // Simulate failure for one page
       if (callCount === 3) {

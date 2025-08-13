@@ -1,20 +1,14 @@
 import type { WatchConfig } from '../../../src/types/watch';
 import { EventEmitter } from 'node:events';
-import * as chokidar from 'chokidar';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FileWatcher } from '../../../src/storage/watcher';
 
-vi.mock('chokidar');
-vi.mock('../../../src/utils/logger');
-vi.mock('../../../src/utils/debounce', () => ({
-  // eslint-disable-next-line ts/no-unsafe-function-type
-  debounce: (fn: Function, _delay: number) => {
-    const debounced = (...args: any[]) => {
-      return fn(...args);
-    };
-    debounced.cancel = vi.fn();
-    return debounced;
-  },
+// Import chokidar after mocking
+import * as chokidar from 'chokidar';
+
+// Mock chokidar module
+vi.mock('chokidar', () => ({
+  watch: vi.fn(),
 }));
 
 describe('fileWatcher', () => {
@@ -31,7 +25,8 @@ describe('fileWatcher', () => {
     mockChokidarWatcher = new EventEmitter();
     mockChokidarWatcher.close = vi.fn().mockResolvedValue(undefined);
 
-    (chokidar.watch as any) = vi.fn().mockReturnValue(mockChokidarWatcher);
+    // Mock chokidar.watch to return our mock watcher
+    (chokidar.watch as any).mockReturnValue(mockChokidarWatcher);
 
     // Create mock sync engine
     mockSyncEngine = {
@@ -115,31 +110,37 @@ describe('fileWatcher', () => {
       await watcher.start();
     });
 
-    it('should emit change event on file add', (done) => {
-      watcher.on('change', (filePath) => {
-        expect(filePath).toBe('test.md');
-        done();
-      });
+    it('should emit change event on file add', () => {
+      return new Promise<void>((resolve) => {
+        watcher.on('change', (filePath) => {
+          expect(filePath).toBe('test.md');
+          resolve();
+        });
 
-      mockChokidarWatcher.emit('add', 'test.md');
+        mockChokidarWatcher.emit('add', 'test.md');
+      });
     });
 
-    it('should emit change event on file change', (done) => {
-      watcher.on('change', (filePath) => {
-        expect(filePath).toBe('test.md');
-        done();
-      });
+    it('should emit change event on file change', () => {
+      return new Promise<void>((resolve) => {
+        watcher.on('change', (filePath) => {
+          expect(filePath).toBe('test.md');
+          resolve();
+        });
 
-      mockChokidarWatcher.emit('change', 'test.md');
+        mockChokidarWatcher.emit('change', 'test.md');
+      });
     });
 
-    it('should emit change event on file unlink', (done) => {
-      watcher.on('change', (filePath) => {
-        expect(filePath).toBe('test.md');
-        done();
-      });
+    it('should emit change event on file unlink', () => {
+      return new Promise<void>((resolve) => {
+        watcher.on('change', (filePath) => {
+          expect(filePath).toBe('test.md');
+          resolve();
+        });
 
-      mockChokidarWatcher.emit('unlink', 'test.md');
+        mockChokidarWatcher.emit('unlink', 'test.md');
+      });
     });
 
     it('should trigger sync after changes', async () => {
@@ -157,21 +158,25 @@ describe('fileWatcher', () => {
       await watcher.start();
     });
 
-    it('should emit sync:start event', (done) => {
-      watcher.on('sync:start', () => {
-        done();
-      });
+    it('should emit sync:start event', () => {
+      return new Promise<void>((resolve) => {
+        watcher.on('sync:start', () => {
+          resolve();
+        });
 
-      mockChokidarWatcher.emit('change', 'test.md');
+        mockChokidarWatcher.emit('change', 'test.md');
+      });
     });
 
-    it('should emit sync:complete event on success', (done) => {
-      watcher.on('sync:complete', (result) => {
-        expect(result.synced).toBe(1);
-        done();
-      });
+    it('should emit sync:complete event on success', () => {
+      return new Promise<void>((resolve) => {
+        watcher.on('sync:complete', (result) => {
+          expect(result.synced).toBe(1);
+          resolve();
+        });
 
-      mockChokidarWatcher.emit('change', 'test.md');
+        mockChokidarWatcher.emit('change', 'test.md');
+      });
     });
 
     it('should map file paths to page IDs', async () => {
@@ -192,45 +197,51 @@ describe('fileWatcher', () => {
       await watcher.start();
     });
 
-    it('should emit sync:error on sync failure', (done) => {
-      const error = new Error('Sync failed');
-      mockSyncEngine.sync.mockRejectedValueOnce(error);
+    it('should emit sync:error on sync failure', () => {
+      return new Promise<void>((resolve) => {
+        const error = new Error('Sync failed');
+        mockSyncEngine.sync.mockRejectedValueOnce(error);
 
-      watcher.on('sync:error', (err) => {
-        expect(err).toBe(error);
-        done();
+        watcher.on('sync:error', (err) => {
+          expect(err).toBe(error);
+          resolve();
+        });
+
+        mockChokidarWatcher.emit('change', 'test.md');
       });
-
-      mockChokidarWatcher.emit('change', 'test.md');
     });
 
-    it('should retry on network errors', (done) => {
-      const networkError = new Error('Network timeout');
-      mockSyncEngine.sync.mockRejectedValueOnce(networkError);
+    it('should retry on network errors', () => {
+      return new Promise<void>((resolve) => {
+        const networkError = new Error('Network timeout');
+        mockSyncEngine.sync.mockRejectedValueOnce(networkError);
 
-      let retryCount = 0;
-      watcher.on('retry', (attempt) => {
-        retryCount = attempt;
-        if (retryCount === 1) {
-          done();
-        }
+        let retryCount = 0;
+        watcher.on('retry', (attempt) => {
+          retryCount = attempt;
+          if (retryCount === 1) {
+            resolve();
+          }
+        });
+
+        mockChokidarWatcher.emit('change', 'test.md');
       });
-
-      mockChokidarWatcher.emit('change', 'test.md');
     });
 
-    it('should not retry on API errors', (done) => {
-      const apiError = new Error('401 Unauthorized');
-      mockSyncEngine.sync.mockRejectedValueOnce(apiError);
+    it('should not retry on API errors', () => {
+      return new Promise<void>((resolve) => {
+        const apiError = new Error('401 Unauthorized');
+        mockSyncEngine.sync.mockRejectedValueOnce(apiError);
 
-      watcher.on('sync:error', () => {
-        setTimeout(() => {
-          expect(mockSyncEngine.sync).toHaveBeenCalledTimes(1);
-          done();
-        }, 200);
+        watcher.on('sync:error', () => {
+          setTimeout(() => {
+            expect(mockSyncEngine.sync).toHaveBeenCalledTimes(1);
+            resolve();
+          }, 200);
+        });
+
+        mockChokidarWatcher.emit('change', 'test.md');
       });
-
-      mockChokidarWatcher.emit('change', 'test.md');
     });
   });
 });

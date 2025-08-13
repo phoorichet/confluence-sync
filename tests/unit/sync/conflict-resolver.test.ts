@@ -1,5 +1,5 @@
 import type { Page } from '../../../src/storage/manifest-manager';
-import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BackupManager } from '../../../src/storage/backup-manager';
 import { FileManager } from '../../../src/storage/file-manager';
 import { ManifestManager } from '../../../src/storage/manifest-manager';
@@ -51,7 +51,7 @@ describe('ConflictResolver', () => {
       };
 
       // Mock manifest load
-      spyOn(manifestManager, 'load').mockResolvedValue({
+      vi.spyOn(manifestManager, 'load').mockResolvedValue({
         version: '2.0.0',
         confluenceUrl: 'https://test.atlassian.net',
         lastSyncTime: new Date(),
@@ -60,7 +60,7 @@ describe('ConflictResolver', () => {
       });
 
       // Mock updatePage
-      const updateSpy = spyOn(manifestManager, 'updatePage').mockResolvedValue();
+      const updateSpy = vi.spyOn(manifestManager, 'updatePage').mockResolvedValue();
 
       const conflict = await conflictResolver.detectConflict(
         pageId,
@@ -94,7 +94,7 @@ describe('ConflictResolver', () => {
         status: 'synced',
       };
 
-      spyOn(manifestManager, 'load').mockResolvedValue({
+      vi.spyOn(manifestManager, 'load').mockResolvedValue({
         version: '2.0.0',
         confluenceUrl: 'https://test.atlassian.net',
         lastSyncTime: new Date(),
@@ -127,7 +127,7 @@ describe('ConflictResolver', () => {
         status: 'synced',
       };
 
-      spyOn(manifestManager, 'load').mockResolvedValue({
+      vi.spyOn(manifestManager, 'load').mockResolvedValue({
         version: '2.0.0',
         confluenceUrl: 'https://test.atlassian.net',
         lastSyncTime: new Date(),
@@ -147,7 +147,7 @@ describe('ConflictResolver', () => {
     });
 
     it('should throw error if page not found in manifest', async () => {
-      spyOn(manifestManager, 'load').mockResolvedValue({
+      vi.spyOn(manifestManager, 'load').mockResolvedValue({
         version: '2.0.0',
         confluenceUrl: 'https://test.atlassian.net',
         lastSyncTime: new Date(),
@@ -202,8 +202,8 @@ describe('ConflictResolver', () => {
       const localContent = 'Local content';
       const remoteContent = 'Remote content';
 
-      const backupSpy = spyOn(backupManager, 'createBackup').mockResolvedValue('/test/file.md.backup');
-      const writeSpy = spyOn(fileManager, 'writeFile').mockResolvedValue('/test/file.md');
+      const backupSpy = vi.spyOn(backupManager, 'createBackup').mockResolvedValue('/test/file.md.backup');
+      const writeSpy = vi.spyOn(fileManager, 'writeFile').mockResolvedValue('/test/file.md');
 
       await conflictResolver.writeConflictFile(filePath, localContent, remoteContent);
 
@@ -215,8 +215,8 @@ describe('ConflictResolver', () => {
     });
 
     it('should handle write errors', async () => {
-      spyOn(backupManager, 'createBackup').mockResolvedValue('/test/file.md.backup');
-      spyOn(fileManager, 'writeFile').mockRejectedValue(new Error('Write failed'));
+      vi.spyOn(backupManager, 'createBackup').mockResolvedValue('/test/file.md.backup');
+      vi.spyOn(fileManager, 'writeFile').mockRejectedValue(new Error('Write failed'));
 
       await expect(
         conflictResolver.writeConflictFile('/test/file.md', 'local', 'remote'),
@@ -239,7 +239,7 @@ describe('ConflictResolver', () => {
         status: 'conflicted',
       };
 
-      spyOn(manifestManager, 'load').mockResolvedValue({
+      vi.spyOn(manifestManager, 'load').mockResolvedValue({
         version: '2.0.0',
         confluenceUrl: 'https://test.atlassian.net',
         lastSyncTime: new Date(),
@@ -247,9 +247,9 @@ describe('ConflictResolver', () => {
         pages: new Map([[pageId, page]]),
       });
 
-      const backupSpy = spyOn(backupManager, 'createBackup').mockResolvedValue('/backup');
-      const writeSpy = spyOn(fileManager, 'writeFile').mockResolvedValue('/test/path.md');
-      const updateSpy = spyOn(manifestManager, 'updatePage').mockResolvedValue();
+      const backupSpy = vi.spyOn(backupManager, 'createBackup').mockResolvedValue('/backup');
+      const writeSpy = vi.spyOn(fileManager, 'writeFile').mockResolvedValue('/test/path.md');
+      const updateSpy = vi.spyOn(manifestManager, 'updatePage').mockResolvedValue();
 
       const localContent = 'Local content to keep';
       await conflictResolver.resolveConflict(pageId, 'local-first', localContent);
@@ -284,7 +284,7 @@ describe('ConflictResolver', () => {
         status: 'conflicted',
       };
 
-      spyOn(manifestManager, 'load').mockResolvedValue({
+      vi.spyOn(manifestManager, 'load').mockResolvedValue({
         version: '2.0.0',
         confluenceUrl: 'https://test.atlassian.net',
         lastSyncTime: new Date(),
@@ -292,9 +292,9 @@ describe('ConflictResolver', () => {
         pages: new Map([[pageId, page]]),
       });
 
-      const backupSpy = spyOn(backupManager, 'createBackup').mockResolvedValue('/backup');
-      const writeSpy = spyOn(fileManager, 'writeFile').mockResolvedValue('/test/path.md');
-      const updateSpy = spyOn(manifestManager, 'updatePage').mockResolvedValue();
+      const backupSpy = vi.spyOn(backupManager, 'createBackup').mockResolvedValue('/backup');
+      const writeSpy = vi.spyOn(fileManager, 'writeFile').mockResolvedValue('/test/path.md');
+      const updateSpy = vi.spyOn(manifestManager, 'updatePage').mockResolvedValue();
 
       const remoteContent = 'Remote content to keep';
       await conflictResolver.resolveConflict(pageId, 'remote-first', undefined, remoteContent);
@@ -324,7 +324,7 @@ describe('ConflictResolver', () => {
         status: 'conflicted',
       };
 
-      spyOn(manifestManager, 'load').mockResolvedValue({
+      vi.spyOn(manifestManager, 'load').mockResolvedValue({
         version: '2.0.0',
         confluenceUrl: 'https://test.atlassian.net',
         lastSyncTime: new Date(),
@@ -332,9 +332,9 @@ describe('ConflictResolver', () => {
         pages: new Map([[pageId, page]]),
       });
 
-      const backupSpy = spyOn(backupManager, 'createBackup').mockResolvedValue('/backup');
-      const writeSpy = spyOn(fileManager, 'writeFile').mockResolvedValue('/test/path.md');
-      const updateSpy = spyOn(manifestManager, 'updatePage').mockResolvedValue();
+      const backupSpy = vi.spyOn(backupManager, 'createBackup').mockResolvedValue('/backup');
+      const writeSpy = vi.spyOn(fileManager, 'writeFile').mockResolvedValue('/test/path.md');
+      const updateSpy = vi.spyOn(manifestManager, 'updatePage').mockResolvedValue();
 
       await conflictResolver.resolveConflict(pageId, 'manual');
 
@@ -360,7 +360,7 @@ describe('ConflictResolver', () => {
         status: 'synced', // Not conflicted
       };
 
-      spyOn(manifestManager, 'load').mockResolvedValue({
+      vi.spyOn(manifestManager, 'load').mockResolvedValue({
         version: '2.0.0',
         confluenceUrl: 'https://test.atlassian.net',
         lastSyncTime: new Date(),
@@ -368,8 +368,8 @@ describe('ConflictResolver', () => {
         pages: new Map([[pageId, page]]),
       });
 
-      const backupSpy = spyOn(backupManager, 'createBackup').mockResolvedValue('/backup');
-      const updateSpy = spyOn(manifestManager, 'updatePage').mockResolvedValue();
+      const backupSpy = vi.spyOn(backupManager, 'createBackup').mockResolvedValue('/backup');
+      const updateSpy = vi.spyOn(manifestManager, 'updatePage').mockResolvedValue();
 
       await conflictResolver.resolveConflict(pageId, 'local-first', 'content');
 
@@ -391,7 +391,7 @@ describe('ConflictResolver', () => {
         status: 'conflicted',
       };
 
-      spyOn(manifestManager, 'load').mockResolvedValue({
+      vi.spyOn(manifestManager, 'load').mockResolvedValue({
         version: '2.0.0',
         confluenceUrl: 'https://test.atlassian.net',
         lastSyncTime: new Date(),
@@ -399,7 +399,7 @@ describe('ConflictResolver', () => {
         pages: new Map([[pageId, page]]),
       });
 
-      spyOn(backupManager, 'createBackup').mockResolvedValue('/backup');
+      vi.spyOn(backupManager, 'createBackup').mockResolvedValue('/backup');
 
       await expect(
         conflictResolver.resolveConflict(pageId, 'invalid' as any),
@@ -445,7 +445,7 @@ describe('ConflictResolver', () => {
         status: 'conflicted',
       };
 
-      spyOn(manifestManager, 'load').mockResolvedValue({
+      vi.spyOn(manifestManager, 'load').mockResolvedValue({
         version: '2.0.0',
         confluenceUrl: 'https://test.atlassian.net',
         lastSyncTime: new Date(),
@@ -471,7 +471,7 @@ describe('ConflictResolver', () => {
     });
 
     it('should return empty array when no conflicts', async () => {
-      spyOn(manifestManager, 'load').mockResolvedValue({
+      vi.spyOn(manifestManager, 'load').mockResolvedValue({
         version: '2.0.0',
         confluenceUrl: 'https://test.atlassian.net',
         lastSyncTime: new Date(),

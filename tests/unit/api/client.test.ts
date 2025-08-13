@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConfluenceAPIClient } from '../../../src/api/client';
 import { AuthManager } from '../../../src/auth/auth-manager';
 
-vi.mock('../../../src/auth/auth-manager');
 
 describe('confluenceAPIClient', () => {
   let client: ConfluenceAPIClient;
@@ -19,7 +18,7 @@ describe('confluenceAPIClient', () => {
       getToken: vi.fn(),
     };
 
-    (AuthManager.getInstance as any).mockReturnValue(mockAuthManager);
+    vi.spyOn(AuthManager, 'getInstance').mockReturnValue(mockAuthManager);
 
     client = ConfluenceAPIClient.getInstance();
   });

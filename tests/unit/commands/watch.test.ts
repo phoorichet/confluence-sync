@@ -5,20 +5,6 @@ import { ManifestManager } from '../../../src/storage/manifest-manager';
 import { FileWatcher } from '../../../src/storage/watcher';
 import { SyncEngine } from '../../../src/sync/engine';
 
-vi.mock('../../../src/storage/watcher');
-vi.mock('../../../src/config/config-manager');
-vi.mock('../../../src/storage/manifest-manager');
-vi.mock('../../../src/sync/engine');
-vi.mock('../../../src/utils/logger');
-vi.mock('ora', () => ({
-  default: () => ({
-    start: vi.fn().mockReturnThis(),
-    stop: vi.fn(),
-    succeed: vi.fn(),
-    fail: vi.fn(),
-  }),
-}));
-
 describe('watch Command', () => {
   let mockWatcher: any;
   let mockConfigManager: any;

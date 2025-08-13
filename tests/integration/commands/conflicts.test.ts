@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Command } from 'commander';
 import { conflictsCommand } from '../../../src/commands/conflicts';
 import { BackupManager } from '../../../src/storage/backup-manager';
@@ -13,15 +13,15 @@ describe('conflictsCommand', () => {
 
   beforeEach(() => {
     // Mock console and process
-    consoleSpy = spyOn(console, 'log').mockImplementation(() => {});
-    exitSpy = spyOn(process, 'exit').mockImplementation(() => {
+    consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('Process exit');
     });
 
     // Silence logger during tests
-    spyOn(logger, 'error').mockImplementation(() => {});
-    spyOn(logger, 'warn').mockImplementation(() => {});
-    spyOn(logger, 'info').mockImplementation(() => {});
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
+    vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    vi.spyOn(logger, 'info').mockImplementation(() => {});
   });
 
   it('should list conflicted files', async () => {
@@ -44,10 +44,10 @@ describe('conflictsCommand', () => {
       setManagers: () => {},
     };
 
-    spyOn(ConflictResolver, 'getInstance').mockReturnValue(mockResolver as any);
-    spyOn(ManifestManager, 'getInstance').mockReturnValue({} as any);
-    spyOn(FileManager, 'getInstance').mockReturnValue({} as any);
-    spyOn(BackupManager, 'getInstance').mockReturnValue({} as any);
+    vi.spyOn(ConflictResolver, 'getInstance').mockReturnValue(mockResolver as any);
+    vi.spyOn(ManifestManager, 'getInstance').mockReturnValue({} as any);
+    vi.spyOn(FileManager, 'getInstance').mockReturnValue({} as any);
+    vi.spyOn(BackupManager, 'getInstance').mockReturnValue({} as any);
 
     // Create a test program to capture output
     const program = new Command();
@@ -69,10 +69,10 @@ describe('conflictsCommand', () => {
       setManagers: () => {},
     };
 
-    spyOn(ConflictResolver, 'getInstance').mockReturnValue(mockResolver as any);
-    spyOn(ManifestManager, 'getInstance').mockReturnValue({} as any);
-    spyOn(FileManager, 'getInstance').mockReturnValue({} as any);
-    spyOn(BackupManager, 'getInstance').mockReturnValue({} as any);
+    vi.spyOn(ConflictResolver, 'getInstance').mockReturnValue(mockResolver as any);
+    vi.spyOn(ManifestManager, 'getInstance').mockReturnValue({} as any);
+    vi.spyOn(FileManager, 'getInstance').mockReturnValue({} as any);
+    vi.spyOn(BackupManager, 'getInstance').mockReturnValue({} as any);
 
     // Create a test program
     const program = new Command();
@@ -92,10 +92,10 @@ describe('conflictsCommand', () => {
       setManagers: () => {},
     };
 
-    spyOn(ConflictResolver, 'getInstance').mockReturnValue(mockResolver as any);
-    spyOn(ManifestManager, 'getInstance').mockReturnValue({} as any);
-    spyOn(FileManager, 'getInstance').mockReturnValue({} as any);
-    spyOn(BackupManager, 'getInstance').mockReturnValue({} as any);
+    vi.spyOn(ConflictResolver, 'getInstance').mockReturnValue(mockResolver as any);
+    vi.spyOn(ManifestManager, 'getInstance').mockReturnValue({} as any);
+    vi.spyOn(FileManager, 'getInstance').mockReturnValue({} as any);
+    vi.spyOn(BackupManager, 'getInstance').mockReturnValue({} as any);
 
     // Create a test program
     const program = new Command();
@@ -127,10 +127,10 @@ describe('conflictsCommand', () => {
       setManagers: () => {},
     };
 
-    spyOn(ConflictResolver, 'getInstance').mockReturnValue(mockResolver as any);
-    spyOn(ManifestManager, 'getInstance').mockReturnValue({} as any);
-    spyOn(FileManager, 'getInstance').mockReturnValue({} as any);
-    spyOn(BackupManager, 'getInstance').mockReturnValue({} as any);
+    vi.spyOn(ConflictResolver, 'getInstance').mockReturnValue(mockResolver as any);
+    vi.spyOn(ManifestManager, 'getInstance').mockReturnValue({} as any);
+    vi.spyOn(FileManager, 'getInstance').mockReturnValue({} as any);
+    vi.spyOn(BackupManager, 'getInstance').mockReturnValue({} as any);
 
     // Create a test program
     const program = new Command();

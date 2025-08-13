@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import process from 'node:process';
 import { z } from 'zod';
 import { logger } from '../utils/logger.ts';
 import {
@@ -16,8 +17,8 @@ export class ProfileManager {
   private activeProfilePath: string;
 
   constructor(configPath?: string) {
-    this.configPath = configPath || path.join(process.cwd(), '.confluence-sync.json');
-    this.activeProfilePath = path.join(path.dirname(this.configPath), '.confluence-sync-profile');
+    this.configPath = configPath || path.join(process.cwd(), 'csconfig.json');
+    this.activeProfilePath = path.join(path.dirname(this.configPath), '.csprofile');
   }
 
   /**
@@ -52,7 +53,7 @@ export class ProfileManager {
         throw createConfigError(
           CONFIG_ERROR_CODES.VALIDATION_ERROR,
           'Configuration validation failed',
-          error.errors,
+          error.issues,
         );
       }
       throw error;

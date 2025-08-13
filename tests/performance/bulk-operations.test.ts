@@ -1,13 +1,13 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient, type PageSingle } from '../../src/api/client';
 import { FileManager } from '../../src/storage/file-manager';
 import { ManifestManager } from '../../src/storage/manifest-manager';
 
 describe('Performance Regression Tests', () => {
-  const testDir = path.join(import.meta.dir, 'test-performance');
+  const testDir = path.join(__dirname, 'test-performance');
   const _manifestPath = path.join(testDir, '.confluence-sync.json');
 
   beforeEach(() => {
@@ -39,7 +39,6 @@ describe('Performance Regression Tests', () => {
           status: 'current',
           title: `Page ${i}`,
           spaceId: 'TEST',
-          spaceKey: 'TEST',
           version: { number: 1, createdAt: '' },
           body: {
             storage: {
@@ -53,8 +52,8 @@ describe('Performance Regression Tests', () => {
       }
 
       // Mock API client to return pages quickly
-      const searchSpy = spyOn(apiClient, 'searchPages').mockResolvedValue(mockPages);
-      const getPageSpy = spyOn(apiClient, 'getPage').mockImplementation(async (id: string) => {
+      const searchSpy = vi.spyOn(apiClient, 'searchPages').mockResolvedValue(mockPages);
+      const getPageSpy = vi.spyOn(apiClient, 'getPage').mockImplementation(async (id: string) => {
         const page = mockPages.find(p => p.id === id);
         if (!page)
           throw new Error('Page not found');
@@ -62,7 +61,7 @@ describe('Performance Regression Tests', () => {
       });
 
       // Mock batch operations
-      const batchGetSpy = spyOn(apiClient, 'batchGetPages').mockImplementation(
+      const batchGetSpy = vi.spyOn(apiClient, 'batchGetPages').mockImplementation(
         async (ids: string[]) => {
           return mockPages.filter(p => ids.includes(p.id));
         },
@@ -85,11 +84,12 @@ describe('Performance Regression Tests', () => {
         await fileManager.writeFile(filePath, content);
 
         // Update manifest
-        await manifestManager.addPage({
-          id: page.id,
-          title: page.title,
+        await manifestManager.updatePage({
+          id: page.id!,
+          title: page.title!,
           spaceKey: 'TEST',
           version: page.version?.number || 1,
+          parentId: null,
           localPath: filePath,
           contentHash: 'hash',
           lastModified: new Date(),
@@ -120,14 +120,13 @@ describe('Performance Regression Tests', () => {
       }
 
       // Mock API responses
-      const createSpy = spyOn(apiClient, 'createPage').mockImplementation(
+      const createSpy = vi.spyOn(apiClient, 'createPage').mockImplementation(
         async (_spaceId: string, title: string, body: string) => {
           return {
             id: Math.random().toString(),
             status: 'current',
             title,
             spaceId: 'TEST',
-            spaceKey: 'TEST',
             version: { number: 1, createdAt: '' },
             body: {
               storage: {
@@ -141,14 +140,13 @@ describe('Performance Regression Tests', () => {
         },
       );
 
-      const batchCreateSpy = spyOn(apiClient, 'batchCreatePages').mockImplementation(
+      const batchCreateSpy = vi.spyOn(apiClient, 'batchCreatePages').mockImplementation(
         async (pages) => {
           const successes = pages.map((p, i) => ({
             id: `${i + 1}`,
             status: 'current' as const,
             title: p.title,
             spaceId: p.spaceId,
-            spaceKey: 'TEST',
             version: { number: 1, createdAt: '' },
             body: {
               storage: {
@@ -166,7 +164,7 @@ describe('Performance Regression Tests', () => {
       const startTime = performance.now();
 
       // Simulate batch push operation
-      const pages = files.map((file, i) => ({
+      const pages = files.map((_file, i) => ({
         spaceId: 'TEST',
         title: `Page ${i + 1}`,
         body: `<p>Content for page ${i + 1}</p>`,
@@ -204,7 +202,6 @@ describe('Performance Regression Tests', () => {
           status: 'current',
           title: `Remote Page ${i}`,
           spaceId: 'TEST',
-          spaceKey: 'TEST',
           version: { number: 2, createdAt: '' },
           body: {
             storage: {
@@ -218,15 +215,14 @@ describe('Performance Regression Tests', () => {
       }
 
       // Mock API operations
-      const batchGetSpy = spyOn(apiClient, 'batchGetPages').mockResolvedValue(mockRemotePages);
-      const batchUpdateSpy = spyOn(apiClient, 'batchUpdatePages').mockImplementation(
+      const batchGetSpy = vi.spyOn(apiClient, 'batchGetPages').mockResolvedValue(mockRemotePages);
+      const batchUpdateSpy = vi.spyOn(apiClient, 'batchUpdatePages').mockImplementation(
         async (updates) => {
           const successes = updates.map(u => ({
             id: u.pageId,
             status: 'current' as const,
             title: u.title,
             spaceId: 'TEST',
-            spaceKey: 'TEST',
             version: { number: u.version + 1, createdAt: '' },
             createdAt: '',
             createdBy: '',
@@ -240,14 +236,14 @@ describe('Performance Regression Tests', () => {
       // Simulate sync operation
       // 1. Fetch remote pages
       const remotePagesData = await apiClient.batchGetPages(
-        mockRemotePages.map(p => p.id),
+        mockRemotePages.map(p => p.id!),
         true,
       );
 
       // 2. Compare and update
       const updates = remotePagesData.map(page => ({
-        pageId: page.id,
-        title: page.title,
+        pageId: page.id!,
+        title: page.title!,
         body: '<p>Updated content</p>',
         version: page.version?.number || 1,
       }));
@@ -308,7 +304,6 @@ describe('Performance Regression Tests', () => {
           status: 'current',
           title: `Page ${i}`,
           spaceId: 'TEST',
-          spaceKey: 'TEST',
           version: { number: 1, createdAt: '' },
           createdAt: '',
           createdBy: '',
@@ -318,7 +313,7 @@ describe('Performance Regression Tests', () => {
       let concurrentCalls = 0;
       let maxConcurrent = 0;
 
-      const getPageSpy = spyOn(apiClient, 'getPage').mockImplementation(async (id: string) => {
+      const getPageSpy = vi.spyOn(apiClient, 'getPage').mockImplementation(async (id: string) => {
         concurrentCalls++;
         maxConcurrent = Math.max(maxConcurrent, concurrentCalls);
 
@@ -336,7 +331,7 @@ describe('Performance Regression Tests', () => {
       const startTime = performance.now();
 
       // Execute concurrent reads
-      const promises = pages.map(p => apiClient.getPage(p.id));
+      const promises = pages.map(p => apiClient.getPage(p.id!));
       const results = await Promise.all(promises);
 
       const endTime = performance.now();
@@ -354,7 +349,7 @@ describe('Performance Regression Tests', () => {
       let concurrentWrites = 0;
       let maxConcurrentWrites = 0;
 
-      const updateSpy = spyOn(apiClient, 'updatePage').mockImplementation(
+      const updateSpy = vi.spyOn(apiClient, 'updatePage').mockImplementation(
         async (_id: string, _body: string, version: number, title: string) => {
           concurrentWrites++;
           maxConcurrentWrites = Math.max(maxConcurrentWrites, concurrentWrites);
@@ -369,7 +364,6 @@ describe('Performance Regression Tests', () => {
             status: 'current',
             title,
             spaceId: 'TEST',
-            spaceKey: 'TEST',
             version: { number: version + 1, createdAt: '' },
             createdAt: '',
             createdBy: '',

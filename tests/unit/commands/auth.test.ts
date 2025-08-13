@@ -3,17 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthManager } from '../../../src/auth/auth-manager';
 import authCommand from '../../../src/commands/auth';
 
+// Mock AuthManager
 vi.mock('../../../src/auth/auth-manager');
-vi.mock('inquirer');
-vi.mock('ora', () => ({
-  default: vi.fn(() => ({
-    start: vi.fn().mockReturnThis(),
-    stop: vi.fn().mockReturnThis(),
-    succeed: vi.fn().mockReturnThis(),
-    fail: vi.fn().mockReturnThis(),
-    warn: vi.fn().mockReturnThis(),
-    info: vi.fn().mockReturnThis(),
-  })),
+
+// Mock inquirer
+vi.mock('inquirer', () => ({
+  default: {
+    prompt: vi.fn(),
+  },
 }));
 
 describe('auth command', () => {
@@ -33,7 +30,7 @@ describe('auth command', () => {
       getToken: vi.fn(),
     };
 
-    vi.mocked(AuthManager).getInstance = vi.fn().mockReturnValue(mockAuthManager);
+    (AuthManager as any).getInstance = vi.fn().mockReturnValue(mockAuthManager);
 
     program = new Command();
     program.addCommand(authCommand);
@@ -185,7 +182,7 @@ describe('auth command', () => {
       });
 
       const inquirer = await import('inquirer');
-      vi.mocked(inquirer.default.prompt).mockResolvedValue({ confirm: true });
+      (inquirer.default.prompt as any).mockResolvedValue({ confirm: true });
 
       mockAuthManager.clearCredentials.mockResolvedValue(undefined);
 
@@ -202,7 +199,7 @@ describe('auth command', () => {
       });
 
       const inquirer = await import('inquirer');
-      vi.mocked(inquirer.default.prompt).mockResolvedValue({ confirm: false });
+      (inquirer.default.prompt as any).mockResolvedValue({ confirm: false });
 
       await program.parseAsync(['node', 'test', 'auth', 'clear']);
 

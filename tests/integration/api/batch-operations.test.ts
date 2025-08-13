@@ -1,5 +1,5 @@
 import type { PageSingle } from '../../../src/api/client';
-import { describe, expect, it, spyOn } from 'bun:test';
+import { describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../../../src/api/client';
 
 describe('Batch API Operations', () => {
@@ -27,7 +27,7 @@ describe('Batch API Operations', () => {
       ];
 
       // Mock the GET /pages endpoint
-      const getSpy = spyOn(apiClient as any, 'client').mockImplementation({
+      const getSpy = vi.spyOn(apiClient as any, 'client').mockImplementation({
         GET: async (path: string, _options: any) => {
           if (path === '/pages') {
             return {
@@ -64,7 +64,7 @@ describe('Batch API Operations', () => {
       }));
 
       let callCount = 0;
-      const getSpy = spyOn(apiClient as any, 'client').mockImplementation({
+      const getSpy = vi.spyOn(apiClient as any, 'client').mockImplementation({
         GET: async (path: string, options: any) => {
           if (path === '/pages') {
             callCount++;
@@ -91,7 +91,7 @@ describe('Batch API Operations', () => {
     });
 
     it('should handle partial failures gracefully', async () => {
-      const getSpy = spyOn(apiClient as any, 'client').mockImplementation({
+      const getSpy = vi.spyOn(apiClient as any, 'client').mockImplementation({
         GET: async (path: string, _options: any) => {
           if (path === '/pages') {
             return {
@@ -128,7 +128,7 @@ describe('Batch API Operations', () => {
         createdBy: '',
       };
 
-      const getSpy = spyOn(apiClient as any, 'client').mockImplementation({
+      const getSpy = vi.spyOn(apiClient as any, 'client').mockImplementation({
         GET: async (path: string, options: any) => {
           if (path === '/pages' && options.params.query['body-format'] === 'storage') {
             return {
@@ -157,7 +157,7 @@ describe('Batch API Operations', () => {
       ];
 
       let createCount = 0;
-      const createSpy = spyOn(apiClient, 'createPage').mockImplementation(
+      const createSpy = vi.spyOn(apiClient, 'createPage').mockImplementation(
         async (_spaceId: string, title: string, _body: string, _parentId?: string) => {
           createCount++;
           return {
@@ -188,7 +188,7 @@ describe('Batch API Operations', () => {
         { spaceId: 'TEST', title: 'Page 3', body: '<p>Content 3</p>' },
       ];
 
-      const createSpy = spyOn(apiClient, 'createPage').mockImplementation(
+      const createSpy = vi.spyOn(apiClient, 'createPage').mockImplementation(
         async (_spaceId: string, title: string, _body: string, _parentId?: string) => {
           if (title === 'Duplicate Page') {
             throw new Error('CS-409: Page already exists');
@@ -223,7 +223,7 @@ describe('Batch API Operations', () => {
         { pageId: '456', title: 'Updated 2', body: '<p>New 2</p>', version: 3 },
       ];
 
-      const updateSpy = spyOn(apiClient, 'updatePage').mockImplementation(
+      const updateSpy = vi.spyOn(apiClient, 'updatePage').mockImplementation(
         async (pageId: string, _body: string, version: number, title: string) => {
           return {
             id: pageId,
@@ -251,7 +251,7 @@ describe('Batch API Operations', () => {
         { pageId: '456', title: 'Updated 2', body: '<p>New 2</p>', version: 999 },
       ];
 
-      const updateSpy = spyOn(apiClient, 'updatePage').mockImplementation(
+      const updateSpy = vi.spyOn(apiClient, 'updatePage').mockImplementation(
         async (pageId: string, _body: string, version: number, title: string) => {
           if (version === 999) {
             throw new Error('CS-409: Version conflict');
@@ -282,7 +282,7 @@ describe('Batch API Operations', () => {
     it('should delete multiple pages concurrently', async () => {
       const pageIds = ['123', '456', '789'];
 
-      const deleteSpy = spyOn(apiClient, 'deletePage').mockImplementation(
+      const deleteSpy = vi.spyOn(apiClient, 'deletePage').mockImplementation(
         async (_pageId: string) => { /* Success */ },
       );
 
@@ -297,7 +297,7 @@ describe('Batch API Operations', () => {
     it('should handle partial failures in batch deletion', async () => {
       const pageIds = ['123', '404', '789'];
 
-      const deleteSpy = spyOn(apiClient, 'deletePage').mockImplementation(
+      const deleteSpy = vi.spyOn(apiClient, 'deletePage').mockImplementation(
         async (pageId: string) => {
           if (pageId === '404') {
             throw new Error('CS-404: Page not found');
