@@ -19,24 +19,31 @@ A powerful CLI tool for bidirectional synchronization between Confluence and loc
 - 🔧 Circuit breaker for API resilience
 - 📈 Performance monitoring and caching
 
-## Installation
+## Quick Start
 
 ### Prerequisites
 
-- [Bun](https://bun.sh) runtime (v1.2.0 or higher)
+- [Bun](https://bun.sh) runtime (v1.2.0 or higher) or Node.js (v14 or higher)
 - Confluence instance (Cloud or Server)
 - API token or password for authentication
 
-### Install Dependencies
+### Installation
+
+No installation required! You can run confluence-sync directly using `bunx`:
 
 ```bash
-bun install
+# Run any command directly with bunx
+bunx confluence-sync@latest --help
 ```
 
-### Build the Project
+Alternatively, install globally:
 
 ```bash
-bun run build
+# Using npm
+npm install -g confluence-sync
+
+# Using bun
+bun install -g confluence-sync
 ```
 
 ### Initial Setup
@@ -44,17 +51,15 @@ bun run build
 Initialize your Confluence sync configuration:
 
 ```bash
-# Interactive mode (if running with Node.js)
-bun run cli init
+# Interactive mode
+bunx confluence-sync@latest init
 
-# Non-interactive mode (required when using Bun directly)
-bun ./src/cli.ts init --url https://your-domain.atlassian.net --email your@email.com --token YOUR_API_TOKEN
+# Non-interactive mode (provide all options)
+bunx confluence-sync@latest init --url https://your-domain.atlassian.net --email your@email.com --token YOUR_API_TOKEN
 
 # Optional: specify a custom sync directory
-bun ./src/cli.ts init --url https://your-domain.atlassian.net --email your@email.com --token YOUR_API_TOKEN --dir ./my-docs
+bunx confluence-sync@latest init --url https://your-domain.atlassian.net --email your@email.com --token YOUR_API_TOKEN --dir ./my-docs
 ```
-
-> **Note**: Due to Bun's TTY limitations, interactive prompts are not supported when running directly with Bun. All required options must be provided via command-line arguments.
 
 ## Authentication
 
@@ -62,13 +67,13 @@ Before using the sync commands, you need to authenticate with your Confluence in
 
 ```bash
 # Authenticate with Confluence (interactive prompts)
-bun run cli auth login
+bunx confluence-sync@latest auth login
 
 # Check current authentication status
-bun run cli auth status
+bunx confluence-sync@latest auth status
 
 # Remove stored credentials
-bun run cli auth logout
+bunx confluence-sync@latest auth logout
 ```
 
 ### Authentication Methods
@@ -84,26 +89,26 @@ bun run cli auth logout
 
 ```bash
 # Pull a specific page by ID
-bun run cli pull 123456789
+bunx confluence-sync@latest pull 123456789
 
 # Pull to a specific directory
-bun run cli pull 123456789 --output ./docs
+bunx confluence-sync@latest pull 123456789 --output ./docs
 
 # Pull a page and all its children recursively
-bun run cli pull 123456789 --recursive
+bunx confluence-sync@latest pull 123456789 --recursive
 
 # Limit recursion depth (default: 10)
-bun run cli pull 123456789 --recursive --max-depth 5
+bunx confluence-sync@latest pull 123456789 --recursive --max-depth 5
 ```
 
 #### Pull an Entire Space
 
 ```bash
 # Pull all pages from a Confluence space
-bun run cli pull --space MYSPACE
+bunx confluence-sync@latest pull --space MYSPACE
 
 # Pull space to a specific directory
-bun run cli pull --space MYSPACE --output ./wiki
+bunx confluence-sync@latest pull --space MYSPACE --output ./wiki
 
 # The space structure will be preserved as:
 # ./wiki/
@@ -121,20 +126,20 @@ bun run cli pull --space MYSPACE --output ./wiki
 
 ```bash
 # Push a Markdown file to update an existing Confluence page
-bun run cli push ./docs/page.md --page-id 123456789
+bunx confluence-sync@latest push ./docs/page.md --page-id 123456789
 
 # Create a new page in a space
-bun run cli push ./docs/new-page.md --space MYSPACE --title "New Page Title"
+bunx confluence-sync@latest push ./docs/new-page.md --space MYSPACE --title "New Page Title"
 
 # Create a child page under a parent
-bun run cli push ./docs/child.md --parent-id 987654321 --title "Child Page"
+bunx confluence-sync@latest push ./docs/child.md --parent-id 987654321 --title "Child Page"
 ```
 
 #### Push Multiple Files
 
 ```bash
 # Push all Markdown files in a directory (bulk hierarchy push)
-bun run cli push ./docs --recursive --space MYSPACE
+bunx confluence-sync@latest push ./docs --recursive --space MYSPACE
 
 # The tool will:
 # 1. Scan the directory structure
@@ -143,10 +148,10 @@ bun run cli push ./docs --recursive --space MYSPACE
 # 4. Report any failed pages at the end
 
 # Example: Push a documentation directory
-bun run cli push ./documentation --recursive --space DOCS
+bunx confluence-sync@latest push ./documentation --recursive --space DOCS
 
 # With a specific parent page
-bun run cli push ./docs/guides --recursive --parent-id 123456789
+bunx confluence-sync@latest push ./docs/guides --recursive --parent-id 123456789
 ```
 
 ### Sync Commands
@@ -155,18 +160,18 @@ bun run cli push ./docs/guides --recursive --parent-id 123456789
 
 ```bash
 # Sync current directory with Confluence
-bun run cli sync
+bunx confluence-sync@latest sync
 
 # Sync a specific directory
-bun run cli sync ./docs
+bunx confluence-sync@latest sync ./docs
 
 # Sync with specific conflict resolution strategy
-bun run cli sync --strategy local-first  # Local changes take precedence
-bun run cli sync --strategy remote-first # Confluence changes take precedence
-bun run cli sync --strategy manual       # Prompt for each conflict (default)
+bunx confluence-sync@latest sync --strategy local-first  # Local changes take precedence
+bunx confluence-sync@latest sync --strategy remote-first # Confluence changes take precedence
+bunx confluence-sync@latest sync --strategy manual       # Prompt for each conflict (default)
 
 # Dry run to preview changes without applying them
-bun run cli sync --dry-run
+bunx confluence-sync@latest sync --dry-run
 ```
 
 ### Watch Mode
@@ -175,19 +180,19 @@ bun run cli sync --dry-run
 
 ```bash
 # Start watching for file changes and sync automatically
-bun run cli watch
+bunx confluence-sync@latest watch
 
 # Customize debounce delay (milliseconds)
-bun run cli watch --debounce 5000
+bunx confluence-sync@latest watch --debounce 5000
 
 # Set max retry attempts on failure
-bun run cli watch --retry 5
+bunx confluence-sync@latest watch --retry 5
 
 # Disable desktop notifications
-bun run cli watch --no-notifications
+bunx confluence-sync@latest watch --no-notifications
 
 # Output in JSON format for scripting
-bun run cli watch --json
+bunx confluence-sync@latest watch --json
 ```
 
 Watch mode features:
@@ -203,7 +208,7 @@ When pulling spaces or recursive pages, the tool preserves the Confluence hierar
 
 ```bash
 # Example: Pull a documentation space
-bun run cli pull --space DOCS --output ./documentation
+bunx confluence-sync@latest pull --space DOCS --output ./documentation
 
 # Result structure:
 # ./documentation/
@@ -226,33 +231,33 @@ bun run cli pull --space DOCS --output ./documentation
 
 ```bash
 # Show sync status of tracked files
-bun run cli status
+bunx confluence-sync@latest status
 
 # Filter status by space
-bun run cli status --space MYSPACE
+bunx confluence-sync@latest status --space MYSPACE
 
 # Output status in JSON format
-bun run cli status --json
+bunx confluence-sync@latest status --json
 
 # Check system health and connectivity
-bun run cli health
+bunx confluence-sync@latest health
 
 # Run all health checks
-bun run cli health --all
+bunx confluence-sync@latest health --all
 ```
 
 ### Conflict Resolution
 
 ```bash
 # List all conflicted files
-bun run cli conflicts list
+bunx confluence-sync@latest conflicts list
 
 # Resolve conflicts interactively
-bun run cli conflicts resolve
+bunx confluence-sync@latest conflicts resolve
 
 # Resolve all conflicts with a strategy
-bun run cli conflicts resolve --strategy local-first
-bun run cli conflicts resolve --strategy remote-first
+bunx confluence-sync@latest conflicts resolve --strategy local-first
+bunx confluence-sync@latest conflicts resolve --strategy remote-first
 ```
 
 ### Advanced Options
@@ -261,27 +266,27 @@ bun run cli conflicts resolve --strategy remote-first
 
 ```bash
 # Use a specific configuration profile for a single command
-bun run cli --profile production pull 123456789
+bunx confluence-sync@latest --profile production pull 123456789
 
 # Or switch profiles permanently
-bun run cli use production
-bun run cli pull 123456789  # Uses production profile
+bunx confluence-sync@latest use production
+bunx confluence-sync@latest pull 123456789  # Uses production profile
 
 # Increase verbosity for debugging
-bun run cli --verbose sync
+bunx confluence-sync@latest --verbose sync
 
 # Suppress all output except errors
-bun run cli --quiet push ./docs
+bunx confluence-sync@latest --quiet push ./docs
 ```
 
 #### Performance Tuning
 
 ```bash
 # Adjust concurrent operations (default: 5)
-bun run cli sync --concurrent 10
+bunx confluence-sync@latest sync --concurrent 10
 
 # Set custom rate limits for API calls
-bun run cli pull --space MYSPACE --rate-limit 100
+bunx confluence-sync@latest pull --space MYSPACE --rate-limit 100
 ```
 
 ## Configuration
@@ -326,24 +331,24 @@ Stores authentication profiles and settings:
 
 ```bash
 # List all configuration profiles
-bun run cli config list-profiles
+bunx confluence-sync@latest config list-profiles
 
 # View current configuration
-bun run cli config view
+bunx confluence-sync@latest config view
 
 # Create a new profile
-bun run cli config create-profile staging --url https://staging.atlassian.net --space STAGE
+bunx confluence-sync@latest config create-profile staging --url https://staging.atlassian.net --space STAGE
 
 # Switch between profiles
-bun run cli use staging
-bun run cli use default
+bunx confluence-sync@latest use staging
+bunx confluence-sync@latest use default
 
 # Delete a profile
-bun run cli config delete-profile staging --force
+bunx confluence-sync@latest config delete-profile staging --force
 
 # Get/set configuration values
-bun run cli config get spaceKey
-bun run cli config set concurrentOperations 10
+bunx confluence-sync@latest config get spaceKey
+bunx confluence-sync@latest config set concurrentOperations 10
 ```
 
 ### Ignore Patterns
@@ -547,10 +552,10 @@ Enable detailed logging for troubleshooting:
 ```bash
 # Set log level to debug
 export LOG_LEVEL=debug
-bun run cli sync
+bunx confluence-sync@latest sync
 
 # Or use verbose flag
-bun run cli --verbose pull 123456789
+bunx confluence-sync@latest --verbose pull 123456789
 ```
 
 ## Contributing

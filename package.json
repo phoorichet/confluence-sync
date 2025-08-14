@@ -1,7 +1,7 @@
 {
   "name": "confluence-sync",
   "type": "module",
-  "version": "0.1.0",
+  "version": "0.1.5",
   "description": "Bi-directional sync tool for Confluence and local markdown files",
   "author": "Your Name <your.email@example.com>",
   "license": "MIT",
@@ -40,6 +40,7 @@
     "exports": "./src/index.ts"
   },
   "scripts": {
+    "prebuild": "bun run scripts/update-version.ts",
     "build": "zshy",
     "cli": "bun run ./src/cli.ts",
     "test": "vitest run",
@@ -69,10 +70,15 @@
     "ora": "^8.2.0",
     "p-limit": "6.2.0",
     "prompts": "^2.4.2",
+    "rehype-parse": "^9.0.1",
+    "rehype-remark": "^10.0.1",
     "remark": "^15.0.1",
     "remark-gfm": "^4.0.1",
     "remark-parse": "^11.0.0",
+    "remark-stringify": "^11.0.0",
+    "unified": "^11.0.5",
     "unist-util-visit": "^5.0.0",
+    "yaml": "^2.8.1",
     "zod": "^4.0.15",
     "zshy": "^0.3.5"
   },
@@ -84,10 +90,6 @@
     "msw": "2.10.4",
     "node-html-parser": "^7.0.1",
     "openapi-typescript": "7.8.0",
-    "rehype-parse": "^9.0.1",
-    "rehype-remark": "^10.0.1",
-    "remark-stringify": "^11.0.0",
-    "unified": "^11.0.5",
     "vitest": "3.2.4"
   }
 }

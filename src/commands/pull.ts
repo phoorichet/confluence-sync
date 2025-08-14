@@ -178,7 +178,6 @@ async function pullSpace(spaceKey: string, outputDir: string, progress: any): Pr
 
     const url = new URL(`https://example.com${pages._links?.next}` || '');
     cursor = url.searchParams.get('cursor') ?? undefined;
-    console.log(`Next cursor: ${cursor}`);
 
     hasMore = !!cursor;
 
