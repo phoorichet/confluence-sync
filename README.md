@@ -48,10 +48,24 @@ bun install -g confluence-sync
 
 ### Initial Setup
 
+#### 1. Create an API Token
+
+**For Confluence Cloud (Atlassian):**
+1. Go to [https://id.atlassian.com/manage/api-tokens](https://id.atlassian.com/manage/api-tokens)
+2. Click **Create API token**
+3. Give your token a descriptive name (e.g., "confluence-sync")
+4. Click **Create**
+5. Copy the generated token immediately (you won't be able to see it again)
+
+**For Confluence Server/Data Center:**
+- Use your regular username and password instead of an API token
+
+#### 2. Initialize Configuration
+
 Initialize your Confluence sync configuration:
 
 ```bash
-# Interactive mode
+# Interactive mode (will prompt for URL, email, and token)
 bunx confluence-sync@latest init
 
 # Non-interactive mode (provide all options)
@@ -60,6 +74,8 @@ bunx confluence-sync@latest init --url https://your-domain.atlassian.net --email
 # Optional: specify a custom sync directory
 bunx confluence-sync@latest init --url https://your-domain.atlassian.net --email your@email.com --token YOUR_API_TOKEN --dir ./my-docs
 ```
+
+**Note:** Replace `YOUR_API_TOKEN` with the token you created in step 1.
 
 ## Authentication
 
