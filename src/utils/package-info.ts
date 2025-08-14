@@ -30,7 +30,7 @@ export function getPackageInfo(): PackageJson {
     // Try from node_modules (when installed as dependency)
     join(process.cwd(), 'node_modules', 'confluence-sync', 'package.json'),
   ];
-  
+
   // For bunx/npx, try to find package.json relative to the CLI script location
   // This uses a different approach that works in CommonJS
   if (typeof __dirname !== 'undefined') {
@@ -47,13 +47,14 @@ export function getPackageInfo(): PackageJson {
         cachedPackageJson = JSON.parse(
           readFileSync(path, 'utf-8'),
         ) as PackageJson;
-        
+
         // Verify this is the right package
         if (cachedPackageJson.name === 'confluence-sync') {
           return cachedPackageJson;
         }
       }
-    } catch {
+    }
+    catch {
       // Continue to next path
     }
   }
