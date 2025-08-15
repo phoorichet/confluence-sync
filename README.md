@@ -69,10 +69,10 @@ Initialize your Confluence sync configuration:
 bunx confluence-sync@latest init
 
 # Non-interactive mode (provide all options)
-bunx confluence-sync@latest init --url https://your-domain.atlassian.net --email your@email.com --token YOUR_API_TOKEN
+bunx confluence-sync@latest init --url https://your-domain.atlassian.net/wiki/api/v2 --email your@email.com --token YOUR_API_TOKEN
 
 # Optional: specify a custom sync directory
-bunx confluence-sync@latest init --url https://your-domain.atlassian.net --email your@email.com --token YOUR_API_TOKEN --dir ./my-docs
+bunx confluence-sync@latest init --url https://your-domain.atlassian.net/wiki/api/v2 --email your@email.com --token YOUR_API_TOKEN --dir ./my-docs
 ```
 
 **Note:** Replace `YOUR_API_TOKEN` with the token you created in step 1.
