@@ -353,7 +353,9 @@ export class ConfluenceToMarkdownConverter {
 
     // Handle table at end of document
     if (inTable && tableLines.length > 0) {
-      const alignedTable = this.alignTable(tableLines);
+      // DISABLED for now as it misaligns some tables
+      // const alignedTable = this.alignTable(tableLines);
+      const alignedTable = tableLines;
       result.push(...alignedTable);
     }
 
