@@ -1,7 +1,7 @@
 {
   "name": "confluence-sync",
   "type": "module",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Bi-directional sync tool for Confluence and local markdown files",
   "author": "Your Name <your.email@example.com>",
   "license": "MIT",

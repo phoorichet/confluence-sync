@@ -63,7 +63,7 @@ export function getPackageInfo(): PackageJson {
   // This ensures the CLI always works, even in unusual environments
   cachedPackageJson = {
     name: 'confluence-sync',
-    version: '0.1.5', // TODO: Update this with each release
+    version: '0.1.6', // TODO: Update this with each release
     description: 'Bi-directional sync tool for Confluence and local markdown files',
   };
 
